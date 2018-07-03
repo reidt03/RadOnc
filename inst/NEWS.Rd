@@ -3,6 +3,27 @@
 \title{ RadOnc News }
 \encoding{UTF-8}
 
+\section{CHANGES IN VERSION 1.1.5}{
+
+  \subsection{NEW FEATURES}{
+    \itemize{
+      \item [currently in development] Adds a modified Earth-Mover's Distance to \code{compareStructures()}
+    }
+  }
+
+  \subsection{OTHER UPDATES}{
+    \itemize{
+      \item Updated \code{RadOnc-package.Rd} file to conform with latest CRAN requirements
+    }
+   }
+
+  \subsection{ACKNOWLEDGEMENTS}{
+    \itemize{
+      \item Credit to Abhinav Nellore and Zachary Fried for their work on \code{compareStructures()}.
+   }
+  }
+ }
+ 
 \section{CHANGES IN VERSION 1.1.4}{
 
   \subsection{NEW FEATURES}{

@@ -4,7 +4,7 @@
 Read DVH data from input file
 }
 \description{
-Function to extract DVH data from input file(s). Supported file formats include Aria (v8-11), DICOM-RT, CadPlan, Monaco, RayStation, and TomoTherapy.
+Function to extract DVH data from input file(s). Supported file formats include Aria (v8-13), DICOM-RT, CadPlan, Monaco, RayStation, and TomoTherapy.
 }
 \usage{
 read.DVH(file, type=NA, verbose=TRUE, collapse=TRUE)
