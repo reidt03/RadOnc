@@ -40,29 +40,29 @@ compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, ve
 			return(results)
 		}
 	)
-# 	if ((plot) & (method %in% c("axial", "grid"))) {
-# 		mar.old <- par()$mar
-# 		par(mar=c(0, 0, 0, 0))
-# 		z.unique <- sort(unique(contours[,3]))
-# 		N.z <- length(z.unique)
-# 		layout(matrix(c(1:N.z*2, 1:N.z*2-1), nrow=N.z, ncol=2), widths=c(1, 10), heights=1)
-# 		levels <- 0:N
-# 		for (z.i in z.unique) {
-# 			contours.i <- contours[which(contours[,3] == z.i), ]
-# 			sum.i <- apply(contours.i[, 1:N+3], 1, sum, na.rm=TRUE)
-# 			x <- unique(contours.i[, 1])
-# 			y <- unique(contours.i[, 2])
-# 			lvl.i <- matrix(sum.i, nrow=length(x), ncol=length(y))
-# 			plot(range(x), range(y), type="n", xaxt="n", yaxt="n")
-# 			graphics::.filled.contour(x, y, z=lvl.i, levels=levels, col=c(NA,rev(heat.colors(N-1))))
-#  			contour(x, y, z=lvl.i, levels=levels, col="black", add=TRUE, drawlabels=FALSE, lwd=0.25)
-# 			plot(1,type="n",xaxt="n",yaxt="n")
-# 			text(1, labels=paste("z=", z.i, sep=""))
-# 		}
-# 		par(mar=mar.old)
-# 	}
-# 	return(contours)
-# }	
+	if ((plot) & (method %in% c("axial", "grid"))) {
+		mar.old <- par()$mar
+		par(mar=c(0, 0, 0, 0))
+		z.unique <- sort(unique(contours[,3]))
+		N.z <- length(z.unique)
+		layout(matrix(c(1:N.z*2, 1:N.z*2-1), nrow=N.z, ncol=2), widths=c(1, 10), heights=1)
+		levels <- 0:N
+		for (z.i in z.unique) {
+			contours.i <- contours[which(contours[,3] == z.i), ]
+			sum.i <- apply(contours.i[, 1:N+3], 1, sum, na.rm=TRUE)
+			x <- unique(contours.i[, 1])
+			y <- unique(contours.i[, 2])
+			lvl.i <- matrix(sum.i, nrow=length(x), ncol=length(y))
+			plot(range(x), range(y), type="n", xaxt="n", yaxt="n")
+			graphics::.filled.contour(x, y, z=lvl.i, levels=levels, col=c(NA,rev(heat.colors(N-1))))
+ 			contour(x, y, z=lvl.i, levels=levels, col="black", add=TRUE, drawlabels=FALSE, lwd=0.25)
+			plot(1,type="n",xaxt="n",yaxt="n")
+			text(1, labels=paste("z=", z.i, sep=""))
+		}
+		par(mar=mar.old)
+	}
+	return(contours)
+}	
 
 compareStructures.surface <- function (structures) {	
 	N <- length(structures)
@@ -76,20 +76,20 @@ compareStructures.surface <- function (structures) {
 		pts <- rbind(pts, structures[[i]]$vertices)
 	}
 	results <- matrix(0, nrow=dim(pts)[1], ncol=N, dimnames=list(NULL, names(structures)))
-# 	for (i in 1:N) {
-# #		plot3d(structures[[i]]$vertices,col="gray",cex=0.2)
-# 		for (j in unique(z[[i]])) {
-# 			pts.j <- pts[which(pts[, 3]== j), 1:2]
-# 			results.j <- rep(0, dim(pts.j)[1])
-# 			z.j <- which(z[[i]] == j)
-# 			## THIS LOOP ACCOUNTS FOR AXIAL SLICES WITH MULTIPLE SEPARATE CLOSED POLYGONS (e.g. 3 ROOTS FOR SINGLE TOOTH)
-# 			## THIS LOOP DOES NOT(!!!) ACCOUNT FOR DONUTS (E.G. STRUCTURES WITH HOLE IN THEM -- NEED TO FIGURE OUT HOW THOSE ARE STORED FIRST) -- IF STRUCTURE HAS A HOLE, ALL BETS ARE OFF AT THE MOMENT... SOLUTION WILL BE TO DO LOGICAL SUBTRACTION RATHER THAN ADDITION OF RESULTS
-# 			for (k in 1:length(z.j)) {
-# 				results.j <- results.j + as.numeric(pointInPoly2D(pts.j[,1:2], structures[[i]]$closed.polys[[z.j[k]]][,1:2]))
-# 			}
-# 			results[which(pts[, 3]== j), i] <- results[which(pts[, 3]== j), i]+results.j
-# 		}
-# 	}
+	for (i in 1:N) {
+#		plot3d(structures[[i]]$vertices,col="gray",cex=0.2)
+		for (j in unique(z[[i]])) {
+			pts.j <- pts[which(pts[, 3]== j), 1:2]
+			results.j <- rep(0, dim(pts.j)[1])
+			z.j <- which(z[[i]] == j)
+			## THIS LOOP ACCOUNTS FOR AXIAL SLICES WITH MULTIPLE SEPARATE CLOSED POLYGONS (e.g. 3 ROOTS FOR SINGLE TOOTH)
+			## THIS LOOP DOES NOT(!!!) ACCOUNT FOR DONUTS (E.G. STRUCTURES WITH HOLE IN THEM -- NEED TO FIGURE OUT HOW THOSE ARE STORED FIRST) -- IF STRUCTURE HAS A HOLE, ALL BETS ARE OFF AT THE MOMENT... SOLUTION WILL BE TO DO LOGICAL SUBTRACTION RATHER THAN ADDITION OF RESULTS
+			for (k in 1:length(z.j)) {
+				results.j <- results.j + as.numeric(pointInPoly2D(pts.j[,1:2], structures[[i]]$closed.polys[[z.j[k]]][,1:2]))
+			}
+			results[which(pts[, 3]== j), i] <- results[which(pts[, 3]== j), i]+results.j
+		}
+	}
 #	points3d(pts, col=rainbow(n=3)[apply(results,1,sum)])
 #	points3d(pts[which(apply(results,1,sum)==3),],col="black",cex=2)
 	return(cbind(pts, results))
