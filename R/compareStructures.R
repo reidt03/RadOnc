@@ -40,7 +40,7 @@ compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, ve
 			return(results)
 		}
 	)
-	if ((plot) & (method %in% c("axial", "grid"))) {
+	#if ((plot) & (method %in% c("axial", "grid"))) {
 		mar.old <- par()$mar
 		par(mar=c(0, 0, 0, 0))
 		z.unique <- sort(unique(contours[,3]))
