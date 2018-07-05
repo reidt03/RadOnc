@@ -1,6 +1,6 @@
 compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, verbose=TRUE, plot=TRUE, pixels=100) {
 	if (class(structures) != "structure.list") {
-		warning("Input 'structures' must be of classs 'structure.list'")
+		warning("Input 'structures' must be of class 'structure.list'")
 		return()
 	}
 	empty <- unlist(lapply(structures, function(struct) {return(dim(struct)[1] <= 0)}))
@@ -13,7 +13,7 @@ compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, ve
 		warning("Need at least 2 structures to perform comparison")
 		return()
 	}
-	method <- match.arg(method, choices=c("axial", "surface", "hausdorff", "grid", "DSC"))
+	method <- match.arg(method, choices=c("axial", "surface", "hausdorff", "grid", "DSC", "EMD"))
 	hausdorff.method <- match.arg(hausdorff.method, choices=c("mean", "median", "absolute"))
 	switch(method,
 		axial = contours <- compareStructures.axial(structures, pixels=pixels),
@@ -37,6 +37,9 @@ compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, ve
 				}
 			}
 			return(results)
+		}
+		EMD = {
+		  return("EMD result")
 		}
 	)
 	if ((plot) & (method %in% c("axial", "grid"))) {
