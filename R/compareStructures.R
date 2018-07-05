@@ -16,12 +16,12 @@ compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, ve
 	method <- match.arg(method, choices=c("axial", "surface", "hausdorff", "grid", "DSC", "EMD"))
 	hausdorff.method <- match.arg(hausdorff.method, choices=c("mean", "median", "absolute"))
 	switch(method,
-		#axial = contours <- compareStructures.axial(structures, pixels=pixels),
+		axial = contours <- compareStructures.axial(structures, pixels=pixels),
 		grid = {
 			warning("method='grid' no longer supported, use method='axial' instead")
 			contours <- compareStructures.axial(structures, pixels=pixels)
 		},
-		#surface = contours <- compareStructures.surface(structures),
+		surface = contours <- compareStructures.surface(structures),
 		hausdorff = return(compareStructures.hausdorff(structures, method=hausdorff.method, verbose=verbose)),
 		EMD = print("EMD Results"),
 		DSC = {
