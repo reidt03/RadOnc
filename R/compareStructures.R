@@ -40,27 +40,27 @@ compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, ve
 			return(results)
 		}
 	)
-	if ((plot) & (method %in% c("axial", "grid"))) {
-		mar.old <- par()$mar
-		par(mar=c(0, 0, 0, 0))
-		z.unique <- sort(unique(contours[,3]))
-		N.z <- length(z.unique)
-		layout(matrix(c(1:N.z*2, 1:N.z*2-1), nrow=N.z, ncol=2), widths=c(1, 10), heights=1)
-		levels <- 0:N
-		for (z.i in z.unique) {
-			contours.i <- contours[which(contours[,3] == z.i), ]
-			sum.i <- apply(contours.i[, 1:N+3], 1, sum, na.rm=TRUE)
-			x <- unique(contours.i[, 1])
-			y <- unique(contours.i[, 2])
-			lvl.i <- matrix(sum.i, nrow=length(x), ncol=length(y))
-			plot(range(x), range(y), type="n", xaxt="n", yaxt="n")
-			graphics::.filled.contour(x, y, z=lvl.i, levels=levels, col=c(NA,rev(heat.colors(N-1))))
- 			contour(x, y, z=lvl.i, levels=levels, col="black", add=TRUE, drawlabels=FALSE, lwd=0.25)
-			plot(1,type="n",xaxt="n",yaxt="n")
-			text(1, labels=paste("z=", z.i, sep=""))
-		}
-		par(mar=mar.old)
-	}
+# 	if ((plot) & (method %in% c("axial", "grid"))) {
+# 		mar.old <- par()$mar
+# 		par(mar=c(0, 0, 0, 0))
+# 		z.unique <- sort(unique(contours[,3]))
+# 		N.z <- length(z.unique)
+# 		layout(matrix(c(1:N.z*2, 1:N.z*2-1), nrow=N.z, ncol=2), widths=c(1, 10), heights=1)
+# 		levels <- 0:N
+# 		for (z.i in z.unique) {
+# 			contours.i <- contours[which(contours[,3] == z.i), ]
+# 			sum.i <- apply(contours.i[, 1:N+3], 1, sum, na.rm=TRUE)
+# 			x <- unique(contours.i[, 1])
+# 			y <- unique(contours.i[, 2])
+# 			lvl.i <- matrix(sum.i, nrow=length(x), ncol=length(y))
+# 			plot(range(x), range(y), type="n", xaxt="n", yaxt="n")
+# 			graphics::.filled.contour(x, y, z=lvl.i, levels=levels, col=c(NA,rev(heat.colors(N-1))))
+#  			contour(x, y, z=lvl.i, levels=levels, col="black", add=TRUE, drawlabels=FALSE, lwd=0.25)
+# 			plot(1,type="n",xaxt="n",yaxt="n")
+# 			text(1, labels=paste("z=", z.i, sep=""))
+# 		}
+# 		par(mar=mar.old)
+# 	}
 #	return(contours)
 }	
 
