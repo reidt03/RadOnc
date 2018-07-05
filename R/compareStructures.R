@@ -1,6 +1,6 @@
 compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, verbose=TRUE, plot=TRUE, pixels=100) {
 	if (class(structures) != "structure.list") {
-		warning("Input 'structures' must be of class 'structure.list'")
+		warning("Input 'structures' must be of classs 'structure.list'")
 		return()
 	}
 	empty <- unlist(lapply(structures, function(struct) {return(dim(struct)[1] <= 0)}))
