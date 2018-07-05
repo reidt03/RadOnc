@@ -76,20 +76,20 @@ compareStructures.surface <- function (structures) {
 		pts <- rbind(pts, structures[[i]]$vertices)
 	}
 	results <- matrix(0, nrow=dim(pts)[1], ncol=N, dimnames=list(NULL, names(structures)))
-	for (i in 1:N) {
-#		plot3d(structures[[i]]$vertices,col="gray",cex=0.2)
-		for (j in unique(z[[i]])) {
-			pts.j <- pts[which(pts[, 3]== j), 1:2]
-			results.j <- rep(0, dim(pts.j)[1])
-			z.j <- which(z[[i]] == j)
-			## THIS LOOP ACCOUNTS FOR AXIAL SLICES WITH MULTIPLE SEPARATE CLOSED POLYGONS (e.g. 3 ROOTS FOR SINGLE TOOTH)
-			## THIS LOOP DOES NOT(!!!) ACCOUNT FOR DONUTS (E.G. STRUCTURES WITH HOLE IN THEM -- NEED TO FIGURE OUT HOW THOSE ARE STORED FIRST) -- IF STRUCTURE HAS A HOLE, ALL BETS ARE OFF AT THE MOMENT... SOLUTION WILL BE TO DO LOGICAL SUBTRACTION RATHER THAN ADDITION OF RESULTS
-			for (k in 1:length(z.j)) {
-				results.j <- results.j + as.numeric(pointInPoly2D(pts.j[,1:2], structures[[i]]$closed.polys[[z.j[k]]][,1:2]))
-			}
-			results[which(pts[, 3]== j), i] <- results[which(pts[, 3]== j), i]+results.j
-		}
-	}
+# 	for (i in 1:N) {
+# #		plot3d(structures[[i]]$vertices,col="gray",cex=0.2)
+# 		for (j in unique(z[[i]])) {
+# 			pts.j <- pts[which(pts[, 3]== j), 1:2]
+# 			results.j <- rep(0, dim(pts.j)[1])
+# 			z.j <- which(z[[i]] == j)
+# 			## THIS LOOP ACCOUNTS FOR AXIAL SLICES WITH MULTIPLE SEPARATE CLOSED POLYGONS (e.g. 3 ROOTS FOR SINGLE TOOTH)
+# 			## THIS LOOP DOES NOT(!!!) ACCOUNT FOR DONUTS (E.G. STRUCTURES WITH HOLE IN THEM -- NEED TO FIGURE OUT HOW THOSE ARE STORED FIRST) -- IF STRUCTURE HAS A HOLE, ALL BETS ARE OFF AT THE MOMENT... SOLUTION WILL BE TO DO LOGICAL SUBTRACTION RATHER THAN ADDITION OF RESULTS
+# 			for (k in 1:length(z.j)) {
+# 				results.j <- results.j + as.numeric(pointInPoly2D(pts.j[,1:2], structures[[i]]$closed.polys[[z.j[k]]][,1:2]))
+# 			}
+# 			results[which(pts[, 3]== j), i] <- results[which(pts[, 3]== j), i]+results.j
+# 		}
+# 	}
 #	points3d(pts, col=rainbow(n=3)[apply(results,1,sum)])
 #	points3d(pts[which(apply(results,1,sum)==3),],col="black",cex=2)
 	return(cbind(pts, results))
