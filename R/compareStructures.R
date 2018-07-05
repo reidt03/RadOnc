@@ -58,11 +58,11 @@ compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, ve
  			contour(x, y, z=lvl.i, levels=levels, col="black", add=TRUE, drawlabels=FALSE, lwd=0.25)
 			plot(1,type="n",xaxt="n",yaxt="n")
 			text(1, labels=paste("z=", z.i, sep=""))
+			return(length(lvl.i))
 		}
 		par(mar=mar.old)
 	}
 	#return(contours)
-	print(lvl.i)
 }	
 
 compareStructures.surface <- function (structures) {	
