@@ -61,7 +61,7 @@ compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, ve
 		}
 		par(mar=mar.old)
 	}
-	return(contours)
+#	return(contours)
 }	
 
 compareStructures.surface <- function (structures) {	
