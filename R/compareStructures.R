@@ -23,6 +23,7 @@ compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, ve
 		},
 		surface = contours <- compareStructures.surface(structures),
 		hausdorff = return(compareStructures.hausdorff(structures, method=hausdorff.method, verbose=verbose)),
+		EMD = return("EMD Results")
 		DSC = {
 			contours <- compareStructures.axial(structures, pixels=pixels)
 			N <- dim(contours)[2]-3
@@ -37,9 +38,6 @@ compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, ve
 				}
 			}
 			return(results)
-		}
-		EMD = {
-		  return("EMD result")
 		}
 	)
 	if ((plot) & (method %in% c("axial", "grid"))) {
