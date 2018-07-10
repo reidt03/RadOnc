@@ -1,4 +1,4 @@
-compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, verbose=TRUE, plot=TRUE, pixels=100, A, wA, B, wB, dist="euclidean", ...) {
+compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, verbose=TRUE, plot=TRUE, pixels=100, A=NULL, wA=NULL, B=NULL, wB=NULL, dist="euclidean", ...) {
 	if (class(structures) != "structure.list") {
 		warning("Input 'structures' must be of class 'structure.list'")
 		return()
