@@ -194,3 +194,7 @@ pointInPoly2D <- function (points, poly) {
 		return(pip2d(poly, points) >= 0)
 	}
 }
+
+.onLoad <- function(libname, RadOnc){
+  print("hello world")
+}
