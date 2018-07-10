@@ -1,4 +1,4 @@
-compareStructures <- function(structures, method=NULL, hausdorff.method=NULL,  verbose=TRUE, plot=TRUE, pixels=100, e = (A, wA, B, wB, dist="euclidean", ...)) {
+compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, verbose=TRUE, plot=TRUE, pixels=100, A, wA, B, wB, dist="euclidean", ...) {
 	if (class(structures) != "structure.list") {
 		warning("Input 'structures' must be of class 'structure.list'")
 		return()
@@ -23,7 +23,7 @@ compareStructures <- function(structures, method=NULL, hausdorff.method=NULL,  v
 		},
 		surface = contours <- compareStructures.surface(structures),
 		hausdorff = return(compareStructures.hausdorff(structures, method=hausdorff.method, verbose=verbose)),
-		EMD = emd(cbind(wA, A), cbind(wB, B), dist=dist, ...),
+		EMD =  emd(cbind(wA, A), cbind(wB, B), dist=dist, ...),
 		DSC = {
 			contours <- compareStructures.axial(structures, pixels=pixels)
 			N <- dim(contours)[2]-3
