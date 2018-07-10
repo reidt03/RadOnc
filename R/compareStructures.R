@@ -196,5 +196,6 @@ pointInPoly2D <- function (points, poly) {
 }
 
 .onLoad <- function(libname, RadOnc){
-  print("hello world")
+  require(devtools)
+  install_github("localfry/emdist")
 }
