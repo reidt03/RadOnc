@@ -1,4 +1,5 @@
 #useDynLib(RadOnc)
+useDynLib(emdist)
 
 import(methods, graphics, grDevices, stats, utils, rgl, geometry, oro.dicom, ptinpoly)
 
