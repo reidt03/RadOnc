@@ -42,8 +42,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <iostream>
-using namespace std;
 
 #define EMD_RUBNER_MAIN 1
 #include "emd-rubner.h"
@@ -851,13 +849,7 @@ static void russel(double *S, double *D)
   for(i=0; i < _n1 ; i++)
     for(j=0; j < _n2 ; j++)
 	MAT(Delta, i, j) = MAT(_C, i, j) - Ur[i].val - Vr[j].val;
-  cout << "Delta Matrix:\n";
-  for(i=0; i< _n1; i++) {
-    for(j=0; j < _n2; j++) {
-      cout << " " << MAT(Delta, i, j) << " ";
-    }
-    cout << "\n";
-  }
+
 
   /* FIND THE BASIC VARIABLES */
   do
