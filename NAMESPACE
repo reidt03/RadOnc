@@ -18,6 +18,10 @@ export(
 	LQE,
 	read.DVH,
 	read.DICOM.RT
+	emd,
+	emdw,
+	emd2d,
+	emdr
 )
 
 exportMethods(
