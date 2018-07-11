@@ -50,6 +50,8 @@ exportMethods(
 	t.test,
 	var,
 	wilcox.test,
+	assign,
+	getNativeSymbolInfo,
 	"names<-",
 	"[",
 	"[[",
