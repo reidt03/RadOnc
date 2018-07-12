@@ -11,3 +11,4 @@ Description: Designed for the import, analysis, and visualization of dosimetric 
 License: GPL (>=2)
 LazyData: yes
 LazyLoad: yes
+RoxygenNote: 6.0.1
