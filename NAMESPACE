@@ -11,6 +11,7 @@ exportClasses(
 )
 
 export(
+	approx3D,
 	calculate.DVH,
 	compareStructures,
 	get.HU,
