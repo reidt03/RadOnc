@@ -21,7 +21,7 @@ export(
 	emd,
 	emdw,
 	emd2d,
-	emdr,
+	emdr
 )
 
 exportMethods(
