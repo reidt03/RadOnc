@@ -17,7 +17,11 @@ export(
 	gEUD,
 	LQE,
 	read.DVH,
-	read.DICOM.RT
+	read.DICOM.RT,
+	emd,
+	emdw,
+	emd2d,
+	emdr,
 )
 
 exportMethods(
