@@ -194,5 +194,3 @@ pointInPoly2D <- function (points, poly) {
 		return(pip2d(poly, points) >= 0)
 	}
 }
-
-
