@@ -1,6 +1,4 @@
 #include <Rcpp.h>
-using namespace Rcpp;
-
 #include "emd-rubner.h"
 
 #include <stdlib.h>
@@ -9,6 +7,9 @@ using namespace Rcpp;
 #define R_NO_REMAP 1
 #define USE_RINTERNALS 1
 #include <Rinternals.h>
+using namespace Rcpp;
+
+
 
 // This is a simple example of exporting a C++ function to R. You can
 // source this function into an R session using the Rcpp::sourceCpp 

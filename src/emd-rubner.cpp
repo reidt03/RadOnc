@@ -1,6 +1,4 @@
 #include <Rcpp.h>
-using namespace Rcpp;
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +10,9 @@ using namespace Rcpp;
 
 #include <R_ext/Error.h>
 #include <R_ext/Print.h>
+using namespace Rcpp;
+
+
 
 // This is a simple example of exporting a C++ function to R. You can
 // source this function into an R session using the Rcpp::sourceCpp 
