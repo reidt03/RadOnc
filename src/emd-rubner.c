@@ -44,7 +44,7 @@ THE SOFTWARE.
 #include <R_ext/Print.h>
 
 #ifndef  DEBUG_LEVEL
-#define DEBUG_LEVEL 0
+#define DEBUG_LEVEL 3
 #endif
 /*
 DEBUG_LEVEL:
@@ -255,8 +255,7 @@ float emd_rubner(signature_t *Signature1, signature_t *Signature2,
   free_globals();
   
   /* RETURN THE NORMALIZED COST == EMD */
-  /*return (float)(totalCost / w);*/
-  printf("%f", totalCost)
+  return (float)(totalCost / w);
 }
 
 /* BEGIN NEW.SU */
