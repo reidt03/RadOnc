@@ -14,6 +14,6 @@ emdr <- function(A, B, extrapolate=NA, flows=FALSE, dist="euclidean", ...) .Call
 
 emd <- function(A, B, dist="euclidean", ...) emdr(A, B, dist=dist, ...)
 
-emdw <- function(A, wA, B, wB, dist="euclidean", ...) emd(cbind(wA, A), cbind(wB, B), dist=dist, ...)
+#emdw <- function(A, wA, B, wB, dist="euclidean", ...) emd(cbind(wA, A), cbind(wB, B), dist=dist, ...)
 
 .onLoad <- function(libname, pkgname) assign(".emd_r", getNativeSymbolInfo("emd_r", PACKAGE=pkgname)$address, topenv())
