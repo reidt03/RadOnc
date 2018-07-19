@@ -95,7 +95,7 @@ the lesser problem. */
 
 static node1_t local_U[SMALL_SIG], local_V[SMALL_SIG];
 
-/*#define MAT(A, M, N) A[(M) + ((N) * max_sig)]*/
+#define MAT(A, M, N) A[(M) + ((N) * max_sig)]
 
 /* GLOBAL VARIABLE DECLARATION */
 static int max_sig; /* size of all structures */
