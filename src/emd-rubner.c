@@ -44,7 +44,7 @@ THE SOFTWARE.
 #include <R_ext/Print.h>
 
 #ifndef  DEBUG_LEVEL
-#define DEBUG_LEVEL 3
+#define DEBUG_LEVEL 0
 #endif
 /*
 DEBUG_LEVEL:
