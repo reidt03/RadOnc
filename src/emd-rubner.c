@@ -255,7 +255,7 @@ float emd_rubner(signature_t *Signature1, signature_t *Signature2,
   free_globals();
   
   /* RETURN THE NORMALIZED COST == EMD */
-  printf(float)(_C);
+  printf(static float)(_C);
   return (float)(totalCost / w);
 }
 
