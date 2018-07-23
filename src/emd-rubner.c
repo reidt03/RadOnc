@@ -247,9 +247,9 @@ float emd_rubner(signature_t *Signature1, signature_t *Signature2,
   if (Flow != NULL)
     *FlowSize = FlowP-Flow;
   
-#if DEBUG_LEVEL > 0
+/*#if DEBUG_LEVEL > 0
   Rprintf("\n*** OPTIMAL SOLUTION (%d ITERATIONS): %f ***\n", itr, totalCost);
-#endif
+#endif*/
   
   if (U != local_U) mem_free(U);
   free_globals();
