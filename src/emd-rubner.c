@@ -136,9 +136,9 @@ static void russel(double *S, double *D);
 static void addBasicVariable(int minI, int minJ, double *S, double *D, 
                              node1_t *PrevUMinI, node1_t *PrevVMinJ,
                              node1_t *UHead);
-/*#if DEBUG_LEVEL > 0
+#if DEBUG_LEVEL > 0
 static void printSolution();
-#endif*/
+#endif
 
 
 static void free_globals() {
