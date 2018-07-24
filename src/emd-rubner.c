@@ -1026,3 +1026,5 @@ static void printSolution()
 }
 #endif
 
+int *y = malloc(sizeof(int) * 10);
+
