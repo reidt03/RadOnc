@@ -309,7 +309,7 @@ float calc_dist_L1(signature_t *Signature1, signature_t *Signature2) {
     {
       MAT(_C, i, j) = dist_L1(P1, P2);
       if (MAT(_C, i, j) > x)
-        x = MAT(_C, i, j) * 5;
+        x = MAT(_C, i, j);
     }
     return x;
 }
