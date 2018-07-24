@@ -44,7 +44,7 @@ THE SOFTWARE.
 #include <R_ext/Print.h>
 
 #ifndef  DEBUG_LEVEL
-#define DEBUG_LEVEL 0
+#define DEBUG_LEVEL 2
 #endif
 /*
 DEBUG_LEVEL:
@@ -259,10 +259,10 @@ float emd_rubner(signature_t *Signature1, signature_t *Signature2,
 }
 
 /* BEGIN NEW.SU */
-static float dist_L2(feature_t *a, feature_t *b) {
-  float d = 0.0;
-  int i = 0;
-  while (i < FDIM) {
+static float dist_L2(feature_t *a, feature_t *b) { /* static means type of memory, float is decimal place of number, function? 2 inputs, first mention of feature_t*/
+  float d = 0.0; /* create a variable d of datatype float */
+  int i = 0; /* create a variable d of datatype int */
+  while (i < FDIM) { /* set as 4 in the header file */
     float s = a->loc[i] - b->loc[i];
     d += s * s;
     i++;
