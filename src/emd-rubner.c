@@ -1025,6 +1025,3 @@ static void printSolution()
     Rprintf("COST = %f\n", totalCost);
 }
 #endif
-
-int *y = malloc(sizeof(int) * 10);
-
