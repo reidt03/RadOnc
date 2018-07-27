@@ -42,7 +42,7 @@
 #ifndef MAX_SIG_SIZE
 #define MAX_SIG_SIZE   511
 #endif
-#define MAX_ITERATIONS 3000
+#define MAX_ITERATIONS 300000
 #define EMD_INFINITY   1e20
 #define EPSILON        1e-6
 
