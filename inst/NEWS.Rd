@@ -11,15 +11,23 @@
     }
   }
 
+  \subsection{BUG FIXES}{
+    \itemize{
+    	\item Adds \code{modality} argument to \code{read.DVH()} to fix problem calculating DVH from DICOM-RT data via \code{read.DVH()} function.
+     }
+  }
+
   \subsection{OTHER UPDATES}{
     \itemize{
       \item Updated \code{RadOnc-package.Rd} file to conform with latest CRAN requirements
+      \item Updated package vignette to correct a typo re: instructions for use
     }
    }
 
   \subsection{ACKNOWLEDGEMENTS}{
     \itemize{
       \item Credit to Abhinav Nellore and Zachary Fried for their work on \code{compareStructures()}.
+      \item Thank you to Enrico Clementel for helping to fix a bug in reading DVHs from DICOM-RT data.
    }
   }
  }
