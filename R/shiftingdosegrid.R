@@ -10,7 +10,7 @@ manEMD <- function(structure1, structure2){
       distanceToTraverse <- ((Bpoint[1]-Apoint[1])^2 + (Bpoint[2]-Apoint[2])^2 + (Bpoint[3] - Apoint[3])^2)^.5 #total distance between starting and ending points
       distTrav <- c((Bpoint[1]-Apoint[1]), (Bpoint[2]-Apoint[2]), (Bpoint[3] - Apoint[3])) #FIX DIVIDE BY ZERO ERROR FOR STEPS
       directionVector <- c(Bpoint[1]-Apoint[1], Bpoint[2]-Apoint[2], Bpoint[3]-Apoint[3]) / distanceToTraverse #unit length vector pointing in direction of line
-      fracVector <- directionVector * 0.001 #step length walking in line direction
+      fracVector <- directionVector * 0.01 #step length walking in line direction
       steps <- floor(distanceToTraverse /(fracVector[1]^2 + fracVector[2]^2 + fracVector[3]^2)^0.5) #how many steps (how many fracVectors fit inside of distanceToTraverse)
       rise <- rep(NA, steps)
     for (i in 1:steps) {
