@@ -14,7 +14,7 @@ manEMD <- function(structure1, structure2){
       steps <- floor(distanceToTraverse /(fracVector[1]^2 + fracVector[2]^2 + fracVector[3]^2)^0.5) #how many steps (how many fracVectors fit inside of distanceToTraverse)
       rise <- rep(NA, steps)
     for (i in 1:steps) {
-        alpha <- Apoint + (i-1) * fracVector
+        alpha <- Apoint + (i-0.5) * fracVector
         beta <- Apoint + i* fracVector
         rise[i] <- abs(approx3D(janedoe.RTdata$dose, x=(beta[1]), y=(beta[2]), z=(beta[3]), extrapolate = TRUE) - approx3D(janedoe.RTdata$dose, x=(alpha[1]), y=(alpha[2]), z=(alpha[3]), extrapolate = TRUE))
     }
@@ -25,7 +25,7 @@ manEMD <- function(structure1, structure2){
 }
 teeth1 <- matrix(data = c(teeth[[1]]$vertices[,1], teeth[[1]]$vertices[,2] - 100, teeth[[1]]$vertices[,3]), 324, 3)
 teeth2 <- matrix(data = c(teeth[[2]]$vertices[,1], teeth[[2]]$vertices[,2] - 100, teeth[[2]]$vertices[,3]), 338, 3)
- # manEMD(teeth1, teeth2)
+#manEMD(teeth1, teeth2)
     
 
 
