@@ -15,7 +15,7 @@ manEMD <- function(structure1, structure2){
       rise <- rep(NA, steps)
     for (i in 1:steps) {
         alpha <- Apoint + (i-0.5) * fracVector
-        beta <- Apoint + i* fracVector
+        beta <- Apoint + (i+0.5 )* fracVector
         rise[i] <- abs(approx3D(janedoe.RTdata$dose, x=(beta[1]), y=(beta[2]), z=(beta[3]), extrapolate = TRUE) - approx3D(janedoe.RTdata$dose, x=(alpha[1]), y=(alpha[2]), z=(alpha[3]), extrapolate = TRUE))
     }
       iterations[i] <- sum(rise, na.rm=TRUE)
