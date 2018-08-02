@@ -23,17 +23,17 @@ manEMD <- function(structure1, structure2){
     EMDres <- mean(iterations, na.rm = TRUE)
     return(EMDres)
 }
-  manEMD(teeth1, teeth2)
+ # manEMD(teeth1, teeth2)
     
 
 
 
 
 
-    dimnames(newjane)[[1]] <- as.character(as.numeric(dimnames(oldjane)[[1]])+0.01*directionVector[1]) #moves the new dose grid in the dirction + magnitude fo the directionVecotr
-    dimnames(newjane)[[2]] <- as.character(as.numeric(dimnames(oldjane)[[2]])+0.01*directionVector[2])
-    dimnames(newjane)[[3]] <- as.character(as.numeric(dimnames(oldjane)[[3]])+5)
-    approx3D(newjane, x=(Apoint[1]), y=(Apoint[2]), z=(Apoint[3]), extrapolate = TRUE)
+    # dimnames(newjane)[[1]] <- as.character(as.numeric(dimnames(oldjane)[[1]])+0.01*directionVector[1]) #moves the new dose grid in the dirction + magnitude fo the directionVecotr
+    # dimnames(newjane)[[2]] <- as.character(as.numeric(dimnames(oldjane)[[2]])+0.01*directionVector[2])
+    # dimnames(newjane)[[3]] <- as.character(as.numeric(dimnames(oldjane)[[3]])+5)
+    # approx3D(newjane, x=(Apoint[1]), y=(Apoint[2]), z=(Apoint[3]), extrapolate = TRUE)
     #calculate differece using approx3D, thats the grad. 
     #integral?
    
