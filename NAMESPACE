@@ -23,7 +23,9 @@ export(
 	emdw,
 	emd2d,
 	emdr,
-	manEMD
+	manEMD,
+	maketeeth1,
+	maketeeth2
 )
 
 exportMethods(
