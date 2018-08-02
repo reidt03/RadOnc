@@ -23,6 +23,8 @@ manEMD <- function(structure1, structure2){
     EMDres <- mean(iterations, na.rm = TRUE)
     return(EMDres)
 }
+teeth1 <- matrix(data = c(teeth[[1]]$vertices[,1], teeth[[1]]$vertices[,2] - 100, teeth[[1]]$vertices[,3]), 324, 3)
+teeth2 <- matrix(data = c(teeth[[2]]$vertices[,1], teeth[[2]]$vertices[,2] - 100, teeth[[2]]$vertices[,3]), 338, 3)
  # manEMD(teeth1, teeth2)
     
 
