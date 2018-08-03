@@ -29,29 +29,11 @@ manEMD <- function(structure1, structure2, doseGrid){
     return(EMDres)
 }
 
-# manEMD(teeth1, teeth2, janedoe.RTdata$dose)
-# manEMD(teeth1, teeth1, janedoe.RTdata$dose)
-# manEMD(teeth1, teeth[[2]]$vertices, janedoe.RTdata$dose)
-# manEMD(OG, OGToTheRight, RTdata$dose)
-# manEMD(OG, OGToTheLeft, RTdata$dose)
-# 
-# maketeeth1 <- function(x){
-#   teeth1 <- matrix(data = c(teeth[[1]]$vertices[,1], teeth[[1]]$vertices[,2] - 100, teeth[[1]]$vertices[,3]), 324, 3)
-# }
-# 
-# maketeeth2 <- function(x){
-#   teeth2 <- matrix(data = c(teeth[[2]]$vertices[,1], teeth[[2]]$vertices[,2] - 100, teeth[[2]]$vertices[,3]), 338, 3)
-}
-# teeth1 <- matrix(data = c(teeth[[1]]$vertices[,1], teeth[[1]]$vertices[,2] - 100, teeth[[1]]$vertices[,3]), 324, 3)
-# teeth2 <- matrix(data = c(teeth[[2]]$vertices[,1], teeth[[2]]$vertices[,2] - 100, teeth[[2]]$vertices[,3]), 338, 3)
+ 
 
 
 
 
-    # dimnames(newjane)[[1]] <- as.character(as.numeric(dimnames(oldjane)[[1]])+0.01*directionVector[1]) #moves the new dose grid in the dirction + magnitude fo the directionVecotr
-    # dimnames(newjane)[[2]] <- as.character(as.numeric(dimnames(oldjane)[[2]])+0.01*directionVector[2])
-    # dimnames(newjane)[[3]] <- as.character(as.numeric(dimnames(oldjane)[[3]])+5)
-    # approx3D(newjane, x=(Apoint[1]), y=(Apoint[2]), z=(Apoint[3]), extrapolate = TRUE)
-    #calculate differece using approx3D, thats the grad. 
-    #integral?
+
+
    
