@@ -26,17 +26,17 @@ compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, ve
 		EMD =  {
 		  contours <- compareStructures.axial(structures, pixels=pixels)
 		  N <- dim(contours)[2]-3
-		  results <- matrix(0, nrow=N, ncol=N, dimnames=list(names(structures), names(structures)))
+		  results <- matrix(NA, nrow=N, ncol=N, dimnames=list(names(structures), names(structures)))
 		  for (i in 1:N) {
 		    for (j in 1:N) {
 		      if (i == j) {
-		        results[i, j] <- 1#
+		        results[i, j] <- 0#
 		        next
 		      }
-		      if(results[i,j]>0){
+		      if(!is.na(results[i,j])){
 		        next()
 		      }
-		      results[i, j] <- manEMD(structure1 = structures[[i]]$vertices, structure2 = structures[[j]]$vertices, doseGrid = dgrid) + 1
+		      results[i, j] <- manEMD(structure1 = structures[[i]]$vertices, structure2 = structures[[j]]$vertices, doseGrid = dgrid)
 		      results[j, i] <- results[i, j]
 		    }
 		  }
