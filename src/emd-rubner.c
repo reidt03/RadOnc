@@ -259,7 +259,60 @@ float emd_rubner(signature_t *Signature1, signature_t *Signature2,
 }
 
 /* BEGIN NEW.SU */
+static float dist_L2(feature_t *a, feature_t *b) { /* static means type of memory, float is decimal place of number, function? 2 inputs, first mention of feature_t*/
+float d = 0.0; /* create a variable d of datatype float */
+int i = 0; /* create a variable d of datatype int */
+while (i < FDIM) { /* set as 4 in the header file */
+float s = a->loc[i] - b->loc[i];
+  d += s * s;
+  i++;
+}
+return sqrtf(d);
+}
 
+static float dist_L1(feature_t *a, feature_t *b) {
+  float d = 0.0;
+  int i = 0;
+  while (i < FDIM) {
+    float s = a->loc[i] - b->loc[i];
+    if (s > 0) 
+      d += s;
+    else
+      d -= s;
+    i++;
+  }
+  return d;
+}
+
+float calc_dist_L2(signature_t *Signature1, signature_t *Signature2) {
+  feature_t *P1, *P2;
+  float x = 0;
+  int i, j;
+  int n1 = Signature1->n, n2 = Signature2->n;
+  for(i = 0, P1 = Signature1->Features; i < n1; i++, P1++)
+    for(j = 0, P2 = Signature2->Features; j < n2; j++, P2++) 
+    {
+      MAT(_C, i, j) = dist_L2(P1, P2);
+      if (MAT(_C, i, j) > x)
+        x = MAT(_C, i, j);
+    }
+    return x;
+}
+
+float calc_dist_L1(signature_t *Signature1, signature_t *Signature2) {
+  feature_t *P1, *P2;
+  float x = 0;
+  int i, j;
+  int n1 = Signature1->n, n2 = Signature2->n;
+  for(i = 0, P1 = Signature1->Features; i < n1; i++, P1++)
+    for(j = 0, P2 = Signature2->Features; j < n2; j++, P2++) 
+    {
+      MAT(_C, i, j) = dist_L1(P1, P2);
+      if (MAT(_C, i, j) > x)
+        x = MAT(_C, i, j);
+    }
+    return x;
+}
 
 /* this is much slower since it involves function calls, but then it's more flexible ... */
 static dist_t *default_dist;
