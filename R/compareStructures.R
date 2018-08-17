@@ -244,11 +244,11 @@ structure2 <- newMat2
   for (i in 1:length(where.on.structure1)) {
     Apoint <- structure1[where.on.structure1[i],]
     Bpoint <- structure2[where.on.structure2[i],]
-    distanceToTraverse <- ((Bpoint[1]-Apoint[1])^2 + (Bpoint[2]-Apoint[2])^2 + (Bpoint[3] - Apoint[3])^2)^.5 #total distance between starting and ending points
-    distTrav <- c((Bpoint[1]-Apoint[1]), (Bpoint[2]-Apoint[2]), (Bpoint[3] - Apoint[3])) #FIX DIVIDE BY ZERO ERROR FOR STEPS
-    directionVector <- c(Bpoint[1]-Apoint[1], Bpoint[2]-Apoint[2], Bpoint[3]-Apoint[3]) / distanceToTraverse #unit length vector pointing in direction of line
-    fracVector <- directionVector * 0.1 #step length walking in line direction
-    steps <- floor(distanceToTraverse /(fracVector[1]^2 + fracVector[2]^2 + fracVector[3]^2)^0.5) #how many steps (how many fracVectors fit inside of distanceToTraverse)
+    distanceToTraverse <- ((Bpoint[1]-Apoint[1])^2 + (Bpoint[2]-Apoint[2])^2 + (Bpoint[3] - Apoint[3])^2)^.5 
+    distTrav <- c((Bpoint[1]-Apoint[1]), (Bpoint[2]-Apoint[2]), (Bpoint[3] - Apoint[3])) 
+    directionVector <- c(Bpoint[1]-Apoint[1], Bpoint[2]-Apoint[2], Bpoint[3]-Apoint[3]) / distanceToTraverse 
+    fracVector <- directionVector * 0.1 
+    steps <- floor(distanceToTraverse /(fracVector[1]^2 + fracVector[2]^2 + fracVector[3]^2)^0.5) 
     if(distanceToTraverse !=  0){
       rise <- rep(NA, steps)
     }else{
@@ -264,4 +264,57 @@ structure2 <- newMat2
   }
   EMDres <- mean(iterations, na.rm = TRUE)
   return(EMDres)
+}
+
+upsample <- function(w){
+  pointsToAdd <- matrix(NA, nrow = 1, ncol = 3 )
+  closedPolyLength <- length(w$closed.polys)
+  for (j in 1:closedPolyLength) {
+    cpMatrix <- matrix(unlist(w$closed.polys[j,]), ncol = 3) 
+    addingToStructure <- matrix(NA, ncol = 3, nrow = 100000) 
+    numRowsMinus1 <- nrow(cpMatrix)-1
+    for (i in 1:numRowsMinus1) { 
+      if(cpMatrix[i,3]>cpMatrix[i+1,3] | cpMatrix[i,3]<cpMatrix[i+1,3]){ 
+        next()
+      }
+      if(((cpMatrix[i+1,1] - cpMatrix[i,1])^2 + (cpMatrix[i+1,2] - cpMatrix[i,2])^2) > 1 & ((cpMatrix[i+1,1] - cpMatrix[i,1])^2 + (cpMatrix[i+1,2] - cpMatrix[i,2])^2) < 2)  { #if distance between points is greater than 1mm, lets add one point between
+        
+        if(cpMatrix[i+1,1]<cpMatrix[i,1]){ 
+          addxIfOne <- 1
+        }else{
+          addxIfOne <- -1
+        }
+        if(cpMatrix[i+1,2]<cpMatrix[i,2]){ 
+          addyIfOne <- 1
+        }else{
+          addyIfOne <- -1
+        }
+        addingToStructure[i,1] <- cpMatrix[i+1,1] + addxIfOne*abs(cpMatrix[i+1,1] - cpMatrix[i,1])/2 
+        addingToStructure[i,2] <- cpMatrix[i+1,2] + addyIfOne*abs(cpMatrix[i+1,2] - cpMatrix[i,2])/2 
+        addingToStructure[i,3] <- cpMatrix[i+1,3] 
+      }
+      if(((cpMatrix[i+1,1] - cpMatrix[i,1])^2 + (cpMatrix[i+1,2] - cpMatrix[i,2])^2) > 2)  { 
+        
+        if(cpMatrix[i+1,1]<cpMatrix[i,1]){ 
+          addxIfOne <- 1
+        }else{
+          addxIfOne <- -1
+        }
+        if(cpMatrix[i+1,2]<cpMatrix[i,2]){ 
+          addyIfOne <- 1
+        }else{
+          addyIfOne <- -1
+        }
+        addingToStructure[i,1] <- cpMatrix[i+1,1] + addxIfOne*abs(cpMatrix[i+1,1] - cpMatrix[i,1])/3 
+        addingToStructure[i,2] <- cpMatrix[i+1,2] + addyIfOne*abs(cpMatrix[i+1,2] - cpMatrix[i,2])/3 
+        addingToStructure[i,3] <- cpMatrix[i+1,3] 
+        addingToStructure[1000*i,1] <- cpMatrix[i+1,1] + 2*addxIfOne*abs(cpMatrix[i+1,1] - cpMatrix[i,1])/3 
+        addingToStructure[1000*i,2] <- cpMatrix[i+1,2] + 2*addyIfOne*abs(cpMatrix[i+1,2] - cpMatrix[i,2])/3 
+        addingToStructure[1000*i,3] <- cpMatrix[i+1,3]
+      }
+    }
+    pointsToAdd<- (rbind(pointsToAdd, addingToStructure[!rowSums(!is.finite(addingToStructure)),]))
+  }
+  length(pointsToAdd)
+  return(pointsToAdd[!rowSums(!is.finite(pointsToAdd)),])
 }
