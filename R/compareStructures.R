@@ -219,18 +219,18 @@ manEMD <- function(structure1, structure2, doseGrid){
     stop()
   }
   
-  structure1NewMatLength <- nrow(pointsAdd(structure1))
+  structure1NewMatLength <- nrow(upsample(structure1))
   structure1VerticesLength <- nrow(structure1$vertices)
-  structure2NewMatLength <- nrow(pointsAdd(structure2))
+  structure2NewMatLength <- nrow(upsample(structure2))
   structure2VerticesLength <- nrow(structure2$vertices)
   if((structure1NewMatLength + structure1VerticesLength) <= (structure2NewMatLength + structure2VerticesLength)){
     numRowsRemove <- structure2NewMatLength + structure2VerticesLength - structure1NewMatLength - structure1VerticesLength
-    newMat1 <- rbind(structure1$vertices, pointsAdd(structure1))
-    newMat2 <- rbind(structure2$vertices, head(pointsAdd(structure2), -numRowsRemove))
+    newMat1 <- rbind(structure1$vertices, upsample(structure1))
+    newMat2 <- rbind(structure2$vertices, head(upsample(structure2), -numRowsRemove))
   }else{
     numRowsRemove <- structure1NewMatLength + structure1VerticesLength - structure2NewMatLength - structure2VerticesLength
-    newMat1 <- rbind(structure1$vertices, head(pointsAdd(structure1), -numRowsRemove))
-    newMat2 <- rbind(structure2$vertices, pointsAdd(structure2))
+    newMat1 <- rbind(structure1$vertices, head(upsample(structure1), -numRowsRemove))
+    newMat2 <- rbind(structure2$vertices, upsample(structure2))
   }
   
 structure1 <- newMat1

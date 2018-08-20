@@ -23,7 +23,8 @@ export(
 	emdw,
 	emd2d,
 	emdr,
-	manEMD
+	manEMD,
+	upsample
 )
 
 exportMethods(
