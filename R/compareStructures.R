@@ -265,7 +265,7 @@ structure2 <- newMat2
   return(EMDres)
 }
 
-manEMD(teeth[[2]], teeth[[3]], janedoe.RTdata$dose)
+#manEMD(teeth[[2]], teeth[[3]], janedoe.RTdata$dose)
 
 upsample <- function(w){
   pointsToAdd <- matrix(NA, nrow = 1, ncol = 3 )
