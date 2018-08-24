@@ -218,6 +218,8 @@ manEMD <- function(structure1, structure2, doseGrid){
     print("You must input a dose grid")
     stop()
   }
+  cat(i)
+  flush.console()
   structure1NewMatLength <- nrow(upsample(structure1))
   structure1VerticesLength <- nrow(structure1$vertices)
   structure2NewMatLength <- nrow(upsample(structure2))
