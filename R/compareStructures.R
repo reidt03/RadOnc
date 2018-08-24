@@ -218,8 +218,6 @@ manEMD <- function(structure1, structure2, doseGrid){
     print("You must input a dose grid")
     stop()
   }
-  cat(i)
-  flush.console()
   structure1NewMatLength <- nrow(upsample(structure1))
   structure1VerticesLength <- nrow(structure1$vertices)
   structure2NewMatLength <- nrow(upsample(structure2))
@@ -243,6 +241,8 @@ structure2 <- newMat2
   where.on.structure2 <- attributes(emdw(structure1, structure1weight, structure2, structure2weight, flows = TRUE))$flows[[2]] + 1;
   iterations <- rep(NA, length(where.on.structure1))
   for (i in 1:length(where.on.structure1)) {
+    cat(i)
+    flush.console()
     Apoint <- structure1[where.on.structure1[i],]
     Bpoint <- structure2[where.on.structure2[i],]
     distanceToTraverse <- ((Bpoint[1]-Apoint[1])^2 + (Bpoint[2]-Apoint[2])^2 + (Bpoint[3] - Apoint[3])^2)^.5 
