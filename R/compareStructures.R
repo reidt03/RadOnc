@@ -218,7 +218,6 @@ manEMD <- function(structure1, structure2, doseGrid){
     print("You must input a dose grid")
     stop()
   }
-  
   structure1NewMatLength <- nrow(upsample(structure1))
   structure1VerticesLength <- nrow(structure1$vertices)
   structure2NewMatLength <- nrow(upsample(structure2))
@@ -247,7 +246,7 @@ structure2 <- newMat2
     distanceToTraverse <- ((Bpoint[1]-Apoint[1])^2 + (Bpoint[2]-Apoint[2])^2 + (Bpoint[3] - Apoint[3])^2)^.5 
     distTrav <- c((Bpoint[1]-Apoint[1]), (Bpoint[2]-Apoint[2]), (Bpoint[3] - Apoint[3])) 
     directionVector <- c(Bpoint[1]-Apoint[1], Bpoint[2]-Apoint[2], Bpoint[3]-Apoint[3]) / distanceToTraverse 
-    fracVector <- directionVector * 0.1 
+    fracVector <- directionVector * 0.1
     steps <- floor(distanceToTraverse /(fracVector[1]^2 + fracVector[2]^2 + fracVector[3]^2)^0.5) 
     if(distanceToTraverse !=  0){
       rise <- rep(NA, steps)
@@ -259,12 +258,14 @@ structure2 <- newMat2
       alpha <- Apoint + (j-0.5) * fracVector
       beta <- Apoint + (j+0.5 )* fracVector
       rise[j] <- abs(approx3D(doseGrid, x=(beta[1]), y=(beta[2]), z=(beta[3]), extrapolate = TRUE) - approx3D(doseGrid, x=(alpha[1]), y=(alpha[2]), z=(alpha[3]), extrapolate = TRUE))
-    }
+     }
     iterations[i] <- sum(rise, na.rm=TRUE)
   }
   EMDres <- mean(iterations, na.rm = TRUE)
   return(EMDres)
 }
+
+manEMD(teeth[[2]], teeth[[3]], janedoe.RTdata$dose)
 
 upsample <- function(w){
   pointsToAdd <- matrix(NA, nrow = 1, ncol = 3 )
@@ -318,3 +319,5 @@ upsample <- function(w){
   length(pointsToAdd)
   return(pointsToAdd[!rowSums(!is.finite(pointsToAdd)),])
 }
+
+
