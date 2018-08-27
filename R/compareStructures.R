@@ -219,14 +219,20 @@ manEMD <- function(structure1, structure2, doseGrid){
     stop()
   }
   structure1NewMatLength <- nrow(upsample(structure1))
+  print("Structure 1 New Matrix Length Set")
   structure1VerticesLength <- nrow(structure1$vertices)
+  print("Structure 1 Orignial Vertices Length Set")
   structure2NewMatLength <- nrow(upsample(structure2))
+  print("Structure 2 New Matrix Length Set")
   structure2VerticesLength <- nrow(structure2$vertices)
+  print("Structure 2 Orignial Vertices Length Set")
   if((structure1NewMatLength + structure1VerticesLength) <= (structure2NewMatLength + structure2VerticesLength)){
+    print("Removing Extra Coordinates from Structure 2...")
     numRowsRemove <- structure2NewMatLength + structure2VerticesLength - structure1NewMatLength - structure1VerticesLength
     newMat1 <- rbind(structure1$vertices, upsample(structure1))
     newMat2 <- rbind(structure2$vertices, head(upsample(structure2), -numRowsRemove))
   }else{
+    print("Removing Extra Coordinates from Structure 1...")
     numRowsRemove <- structure1NewMatLength + structure1VerticesLength - structure2NewMatLength - structure2VerticesLength
     newMat1 <- rbind(structure1$vertices, head(upsample(structure1), -numRowsRemove))
     newMat2 <- rbind(structure2$vertices, upsample(structure2))
@@ -234,22 +240,27 @@ manEMD <- function(structure1, structure2, doseGrid){
   
 structure1 <- newMat1
 structure2 <- newMat2
+print("New Structures Defined")
   
   structure1weight <- matrix(c(rep(1, times = length(structure1)/3)))
   structure2weight <- matrix(c(rep(1, times = length(structure2)/3)))
-  where.on.structure1 <- attributes(emdw(structure1, structure1weight, structure2, structure2weight, flows = TRUE))$flows[[1]] + 1;
-  where.on.structure2 <- attributes(emdw(structure1, structure1weight, structure2, structure2weight, flows = TRUE))$flows[[2]] + 1;
+  print("Structure Weights Defined")
+  print("Calculating Flows...")
+  flows <- attributes(emdw(structure1, structure1weight, structure2, structure2weight, flows = TRUE))$flows
+  where.on.structure1 <- flows[[1]] + 1;
+  where.on.structure2 <- flows[[2]] + 1;
+  print("Done Calculating Flows")
   iterations <- rep(NA, length(where.on.structure1))
+  print("Starting EMD Calculation...")
+  
   for (i in 1:length(where.on.structure1)) {
-    cat(i)
-    flush.console()
     Apoint <- structure1[where.on.structure1[i],]
     Bpoint <- structure2[where.on.structure2[i],]
-    distanceToTraverse <- ((Bpoint[1]-Apoint[1])^2 + (Bpoint[2]-Apoint[2])^2 + (Bpoint[3] - Apoint[3])^2)^.5 
-    distTrav <- c((Bpoint[1]-Apoint[1]), (Bpoint[2]-Apoint[2]), (Bpoint[3] - Apoint[3])) 
-    directionVector <- c(Bpoint[1]-Apoint[1], Bpoint[2]-Apoint[2], Bpoint[3]-Apoint[3]) / distanceToTraverse 
+    distanceToTraverse <- ((Bpoint[1]-Apoint[1])^2 + (Bpoint[2]-Apoint[2])^2 + (Bpoint[3] - Apoint[3])^2)^.5
+    distTrav <- c((Bpoint[1]-Apoint[1]), (Bpoint[2]-Apoint[2]), (Bpoint[3] - Apoint[3]))
+    directionVector <- c(Bpoint[1]-Apoint[1], Bpoint[2]-Apoint[2], Bpoint[3]-Apoint[3]) / distanceToTraverse
     fracVector <- directionVector * 0.1
-    steps <- floor(distanceToTraverse /(fracVector[1]^2 + fracVector[2]^2 + fracVector[3]^2)^0.5) 
+    steps <- floor(distanceToTraverse /(fracVector[1]^2 + fracVector[2]^2 + fracVector[3]^2)^0.5)
     if(distanceToTraverse !=  0){
       rise <- rep(NA, steps)
     }else{
@@ -260,130 +271,68 @@ structure2 <- newMat2
       alpha <- Apoint + (j-0.5) * fracVector
       beta <- Apoint + (j+0.5 )* fracVector
       rise[j] <- abs(approx3D(doseGrid, x=(beta[1]), y=(beta[2]), z=(beta[3]), extrapolate = TRUE) - approx3D(doseGrid, x=(alpha[1]), y=(alpha[2]), z=(alpha[3]), extrapolate = TRUE))
-     }
+    }
     iterations[i] <- sum(rise, na.rm=TRUE)
+    print("Calculating Intergral for Pair:")
+    print(i)
   }
   EMDres <- mean(iterations, na.rm = TRUE)
+  print("EMD Result:")
   return(EMDres)
-}
-
-
-upsample <- function(w){
-  pointsToAdd <- matrix(NA, nrow = 1, ncol = 3 )
-  closedPolyLength <- length(w$closed.polys)
-  for (j in 1:closedPolyLength) {
-    cpMatrix <- matrix(unlist(w$closed.polys[j,]), ncol = 3) 
-    addingToStructure <- matrix(NA, ncol = 3, nrow = 2) 
-    numRowsMinus1 <- nrow(cpMatrix)-1
-    for (i in 1:numRowsMinus1) { 
-      if(cpMatrix[i,3]>cpMatrix[i+1,3] | cpMatrix[i,3]<cpMatrix[i+1,3]){ 
-        next()
-      }
-      if(((cpMatrix[i+1,1] - cpMatrix[i,1])^2 + (cpMatrix[i+1,2] - cpMatrix[i,2])^2) > 1 & ((cpMatrix[i+1,1] - cpMatrix[i,1])^2 + (cpMatrix[i+1,2] - cpMatrix[i,2])^2) < 2)  { #if distance between points is greater than 1mm, lets add one point between
-        
-        if(cpMatrix[i+1,1]<cpMatrix[i,1]){ 
-          addxIfOne <- 1
-        }else{
-          addxIfOne <- -1
-        }
-        if(cpMatrix[i+1,2]<cpMatrix[i,2]){ 
-          addyIfOne <- 1
-        }else{
-          addyIfOne <- -1
-        }
-        addingToStructure[1,1] <- cpMatrix[i+1,1] + addxIfOne*abs(cpMatrix[i+1,1] - cpMatrix[i,1])/2 
-        addingToStructure[1,2] <- cpMatrix[i+1,2] + addyIfOne*abs(cpMatrix[i+1,2] - cpMatrix[i,2])/2 
-        addingToStructure[1,3] <- cpMatrix[i+1,3] 
-        pointsToAdd<- (rbind(pointsToAdd, addingToStructure[!rowSums(!is.finite(addingToStructure)),]))
-      }
-      if(((cpMatrix[i+1,1] - cpMatrix[i,1])^2 + (cpMatrix[i+1,2] - cpMatrix[i,2])^2) > 2)  { 
-        
-        if(cpMatrix[i+1,1]<cpMatrix[i,1]){ 
-          addxIfOne <- 1
-        }else{
-          addxIfOne <- -1
-        }
-        if(cpMatrix[i+1,2]<cpMatrix[i,2]){ 
-          addyIfOne <- 1
-        }else{
-          addyIfOne <- -1
-        }
-        addingToStructure[1,1] <- cpMatrix[i+1,1] + addxIfOne*abs(cpMatrix[i+1,1] - cpMatrix[i,1])/3 
-        addingToStructure[1,2] <- cpMatrix[i+1,2] + addyIfOne*abs(cpMatrix[i+1,2] - cpMatrix[i,2])/3 
-        addingToStructure[1,3] <- cpMatrix[i+1,3] 
-        addingToStructure[2,1] <- cpMatrix[i+1,1] + 2*addxIfOne*abs(cpMatrix[i+1,1] - cpMatrix[i,1])/3 
-        addingToStructure[2,2] <- cpMatrix[i+1,2] + 2*addyIfOne*abs(cpMatrix[i+1,2] - cpMatrix[i,2])/3 
-        addingToStructure[2,3] <- cpMatrix[i+1,3]
-        pointsToAdd<- (rbind(pointsToAdd, addingToStructure[!rowSums(!is.finite(addingToStructure)),]))
-      }
-    }
   }
-  length(pointsToAdd)
-  shorterMat <- head(pointsToAdd[!rowSums(!is.finite(pointsToAdd)),], 10)
-  return(shorterMat)
-}
 
 
+ upsample <- function(w){
+   pointsToAdd <- matrix(NA, nrow = 1, ncol = 3 )
+   closedPolyLength <- length(w$closed.polys)
+   for (j in 1:closedPolyLength) {
+     cpMatrix <- matrix(unlist(w$closed.polys[j,]), ncol = 3)
+     addingToStructure <- matrix(NA, ncol = 3, nrow = 100000)
+     numRowsMinus1 <- nrow(cpMatrix)-1
+     for (i in 1:numRowsMinus1) {
+       if(cpMatrix[i,3]>cpMatrix[i+1,3] | cpMatrix[i,3]<cpMatrix[i+1,3]){
+         next()
+       }
+       if(((cpMatrix[i+1,1] - cpMatrix[i,1])^2 + (cpMatrix[i+1,2] - cpMatrix[i,2])^2) > 1 & ((cpMatrix[i+1,1] - cpMatrix[i,1])^2 + (cpMatrix[i+1,2] - cpMatrix[i,2])^2) < 2)  { #if distance between points is greater than 1mm, lets add one point between
+
+         if(cpMatrix[i+1,1]<cpMatrix[i,1]){
+           addxIfOne <- 1
+         }else{
+           addxIfOne <- -1
+         }
+         if(cpMatrix[i+1,2]<cpMatrix[i,2]){
+           addyIfOne <- 1
+         }else{
+           addyIfOne <- -1
+         }
+         addingToStructure[i,1] <- cpMatrix[i+1,1] + addxIfOne*abs(cpMatrix[i+1,1] - cpMatrix[i,1])/2
+         addingToStructure[i,2] <- cpMatrix[i+1,2] + addyIfOne*abs(cpMatrix[i+1,2] - cpMatrix[i,2])/2
+         addingToStructure[i,3] <- cpMatrix[i+1,3]
+       }
+       if(((cpMatrix[i+1,1] - cpMatrix[i,1])^2 + (cpMatrix[i+1,2] - cpMatrix[i,2])^2) > 2)  {
+
+         if(cpMatrix[i+1,1]<cpMatrix[i,1]){
+           addxIfOne <- 1
+         }else{
+           addxIfOne <- -1
+         }
+         if(cpMatrix[i+1,2]<cpMatrix[i,2]){
+           addyIfOne <- 1
+         }else{
+           addyIfOne <- -1
+         }
+         addingToStructure[i,1] <- cpMatrix[i+1,1] + addxIfOne*abs(cpMatrix[i+1,1] - cpMatrix[i,1])/3
+         addingToStructure[i,2] <- cpMatrix[i+1,2] + addyIfOne*abs(cpMatrix[i+1,2] - cpMatrix[i,2])/3
+         addingToStructure[i,3] <- cpMatrix[i+1,3]
+         addingToStructure[1000*i,1] <- cpMatrix[i+1,1] + 2*addxIfOne*abs(cpMatrix[i+1,1] - cpMatrix[i,1])/3
+         addingToStructure[1000*i,2] <- cpMatrix[i+1,2] + 2*addyIfOne*abs(cpMatrix[i+1,2] - cpMatrix[i,2])/3
+         addingToStructure[1000*i,3] <- cpMatrix[i+1,3]
+       }
+     }
+     pointsToAdd<- (rbind(pointsToAdd, addingToStructure[!rowSums(!is.finite(addingToStructure)),]))
+   }
+   length(pointsToAdd)
+   return(pointsToAdd[!rowSums(!is.finite(pointsToAdd)),])
+ }
 
 
-
-
-
-
-
-#manEMD(teeth[[2]], teeth[[3]], janedoe.RTdata$dose)
-
-# upsample <- function(w){
-#   pointsToAdd <- matrix(NA, nrow = 1, ncol = 3 )
-#   closedPolyLength <- length(w$closed.polys)
-#   for (j in 1:closedPolyLength) {
-#     cpMatrix <- matrix(unlist(w$closed.polys[j,]), ncol = 3) 
-#     addingToStructure <- matrix(NA, ncol = 3, nrow = 100000) 
-#     numRowsMinus1 <- nrow(cpMatrix)-1
-#     for (i in 1:numRowsMinus1) { 
-#       if(cpMatrix[i,3]>cpMatrix[i+1,3] | cpMatrix[i,3]<cpMatrix[i+1,3]){ 
-#         next()
-#       }
-#       if(((cpMatrix[i+1,1] - cpMatrix[i,1])^2 + (cpMatrix[i+1,2] - cpMatrix[i,2])^2) > 1 & ((cpMatrix[i+1,1] - cpMatrix[i,1])^2 + (cpMatrix[i+1,2] - cpMatrix[i,2])^2) < 2)  { #if distance between points is greater than 1mm, lets add one point between
-#         
-#         if(cpMatrix[i+1,1]<cpMatrix[i,1]){ 
-#           addxIfOne <- 1
-#         }else{
-#           addxIfOne <- -1
-#         }
-#         if(cpMatrix[i+1,2]<cpMatrix[i,2]){ 
-#           addyIfOne <- 1
-#         }else{
-#           addyIfOne <- -1
-#         }
-#         addingToStructure[i,1] <- cpMatrix[i+1,1] + addxIfOne*abs(cpMatrix[i+1,1] - cpMatrix[i,1])/2 
-#         addingToStructure[i,2] <- cpMatrix[i+1,2] + addyIfOne*abs(cpMatrix[i+1,2] - cpMatrix[i,2])/2 
-#         addingToStructure[i,3] <- cpMatrix[i+1,3] 
-#       }
-#       if(((cpMatrix[i+1,1] - cpMatrix[i,1])^2 + (cpMatrix[i+1,2] - cpMatrix[i,2])^2) > 2)  { 
-#         
-#         if(cpMatrix[i+1,1]<cpMatrix[i,1]){ 
-#           addxIfOne <- 1
-#         }else{
-#           addxIfOne <- -1
-#         }
-#         if(cpMatrix[i+1,2]<cpMatrix[i,2]){ 
-#           addyIfOne <- 1
-#         }else{
-#           addyIfOne <- -1
-#         }
-#         addingToStructure[i,1] <- cpMatrix[i+1,1] + addxIfOne*abs(cpMatrix[i+1,1] - cpMatrix[i,1])/3 
-#         addingToStructure[i,2] <- cpMatrix[i+1,2] + addyIfOne*abs(cpMatrix[i+1,2] - cpMatrix[i,2])/3 
-#         addingToStructure[i,3] <- cpMatrix[i+1,3] 
-#         addingToStructure[1000*i,1] <- cpMatrix[i+1,1] + 2*addxIfOne*abs(cpMatrix[i+1,1] - cpMatrix[i,1])/3 
-#         addingToStructure[1000*i,2] <- cpMatrix[i+1,2] + 2*addyIfOne*abs(cpMatrix[i+1,2] - cpMatrix[i,2])/3 
-#         addingToStructure[1000*i,3] <- cpMatrix[i+1,3]
-#       }
-#     }
-#     pointsToAdd<- (rbind(pointsToAdd, addingToStructure[!rowSums(!is.finite(addingToStructure)),]))
-#   }
-#   length(pointsToAdd)
-#   return(pointsToAdd[!rowSums(!is.finite(pointsToAdd)),])
-# }
-# 
-# 
