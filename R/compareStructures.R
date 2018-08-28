@@ -280,10 +280,7 @@ print("New Structures Defined")
   print("EMD Result:")
   return(EMDres)
 }
-manEMD()
-2.126659 0.01
-2.126574 0.1
-2.125107 1
+
 upsample <- function(w){
   pointsToAdd <- matrix(NA, nrow = 1, ncol = 3 )
   closedPolyLength <- length(w$closed.polys)
