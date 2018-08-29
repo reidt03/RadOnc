@@ -272,7 +272,7 @@ print("New Structures Defined")
       beta <- Apoint + (j+0.5 )* fracVector
       rise[j] <- abs(approx3D(doseGrid, x=(beta[1]), y=(beta[2]), z=(beta[3]), extrapolate = TRUE) - approx3D(doseGrid, x=(alpha[1]), y=(alpha[2]), z=(alpha[3]), extrapolate = TRUE))
     }
-    iterations[i] <- sum(rise, na.rm=TRUE)
+    iterations[i] <- (sum(rise, na.rm=TRUE)/distTrav)
     print("Calculating Intergral for Pair:")
     print(i)
   }
