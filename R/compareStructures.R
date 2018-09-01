@@ -213,7 +213,8 @@ pointInPoly2D <- function (points, poly) {
   }
 }
 
-manEMD <- function(structure1, structure2, doseGrid){ 
+manEMD <- function(structure1, structure2, doseGrid){
+  options(warn=-1)
   if(is.null(doseGrid)){
     print("You must input a dose grid")
     stop()
@@ -332,7 +333,7 @@ upsample <- function(w){
     }
   }
   length(pointsToAdd)
-  shorterMat <- head(pointsToAdd[!rowSums(!is.finite(pointsToAdd)),], 10)
+  shorterMat <- head(pointsToAdd[!rowSums(!is.finite(pointsToAdd)),], length(pointsToAdd))
   return(shorterMat)
 }
 
