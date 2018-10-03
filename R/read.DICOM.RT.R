@@ -115,7 +115,14 @@ read.DICOM.RT <- function(path, exclude=NULL, recursive=TRUE, verbose=TRUE, limi
 		}
 		DICOMs$hdr[[i]] <- DICOM.i$hdr
 		frame.ref.CT.i <- as.character(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "FrameOfReferenceUID"), "value"])
-		
+
+		if (length(frame.ref.CT.i) > 1) {
+			frame.ref.CT.i <- frame.ref.CT.i[which(frame.ref.CT.i != "")]
+			if (length(unique(frame.ref.CT.i)) > 1) {
+				frame.ref.CT.i <- frame.ref.CT
+				warning("Ambiguous reference frame in dose grid file")
+			}
+		}		
 		if (length(frame.ref.CT.i) < 1) {
 			frame.ref.CT.i <- frame.ref.CT
 			warning("No reference frame in dose grid file")
@@ -263,6 +270,13 @@ read.DICOM.RT <- function(path, exclude=NULL, recursive=TRUE, verbose=TRUE, limi
 		structureset.i.ID <- as.character(DICOM.i[which(DICOM.i[,"name"] == "SOPInstanceUID"), "value"])
 #		use.dose.grid <- c(use.dose.grid, !structureset.i.ID %in% structureset.ID)
 		use.dose.grid <- c(use.dose.grid, TRUE) ## CALCULATE DVH FROM DOSE GRID RATHER THAN USING EXISTENT DVHs IN DICOM DOSE FILE
+		if (length(frame.ref.CT.i) > 1) {
+			frame.ref.CT.i <- frame.ref.CT.i[which(frame.ref.CT.i != "")]
+			if (length(unique(frame.ref.CT.i)) > 1) {
+				frame.ref.CT.i <- frame.ref.CT
+				warning("Ambiguous reference frame in structure set file")
+			}
+		}		
 		if (length(frame.ref.CT.i) < 1) {
 			frame.ref.CT.i <- frame.ref.CT
 			warning("No reference frame in structure set file")

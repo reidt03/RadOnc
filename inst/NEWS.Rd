@@ -14,6 +14,7 @@
   \subsection{BUG FIXES}{
     \itemize{
     	\item Adds \code{modality} argument to \code{read.DVH()} to fix problem calculating DVH from DICOM-RT data via \code{read.DVH()} function.
+    	\item Fixes bug in \code{read.DICOM.RT()} that was occurring for rare files with improperly formatted reference frame UIDs.
      }
   }
 
@@ -28,6 +29,7 @@
     \itemize{
       \item Credit to Abhinav Nellore and Zachary Fried for their work on \code{compareStructures()}.
       \item Thank you to Enrico Clementel for helping to fix a bug in reading DVHs from DICOM-RT data.
+      \item Thank you to Alessandro Savini for helping to uncover the issue in DICOM reference frame UID handling.
    }
   }
  }
