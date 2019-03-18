@@ -2,7 +2,7 @@ Package: RadOnc
 Type: Package
 Title: Analytical Tools for Radiation Oncology
 Version: 1.1.5
-Date: 2018-10-03
+Date: 2019-03-18
 Author: Reid F. Thompson <reid.thompson@gmail.com>
 Maintainer: Reid F. Thompson <reid.thompson@gmail.com>
 Imports: stats, utils
