@@ -1,6 +1,6 @@
 read.DVH <- function (file, type=NA, verbose=TRUE, collapse=TRUE, modality=NULL) {
 	type <- match.arg(tolower(type), choices=c(NA, "aria10", "aria11", "aria13", "aria8", "dicom", "cadplan", "tomo", "monaco", "raystation"), several.ok=TRUE)
-	modality <- match.arg(toupper(modality), choices=c("CT", "MR"))
+	modality <- match.arg(modality, choices=c("CT", "MR"))
 	if (length(file) < 1) {
 		warning("argument 'file' is missing, with no default")
 		return()
