@@ -28,7 +28,7 @@
   \subsection{ACKNOWLEDGEMENTS}{
     \itemize{
       \item Credit to Abhinav Nellore and Zachary Fried for their work on \code{compareStructures()}.
-      \item Thank you to Enrico Clementel for helping to fix a bug in reading DVHs from DICOM-RT data.
+      \item Thank you to Enrico Clementel and Fadoua Raouassi for helping to fix a bug in reading DVHs from DICOM-RT data.
       \item Thank you to Alessandro Savini for helping to uncover the issue in DICOM reference frame UID handling.
    }
   }
