@@ -1,5 +1,5 @@
 
-read.DICOM.RT <- function(path, exclude=NULL, recursive=TRUE, verbose=TRUE, limit=NULL, DVH=TRUE, zDVH=FALSE, modality=NULL, ...) {
+read.DICOM.RT <- function(path, exclude=NULL, recursive=TRUE, verbose=TRUE, limit=NULL, DVH=TRUE, zDVH=FALSE, modality="CT", ...) {
 	modality <- match.arg(toupper(modality), choices=c("CT", "MR"))
 	if (length(list.files(path)) == 0 && file.exists(path)) {
     	filenames <- path
