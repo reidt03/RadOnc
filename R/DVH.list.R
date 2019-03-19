@@ -50,7 +50,7 @@ setMethod("length", "DVH.list",
 
 setMethod("[", "DVH.list",
 	function (x, i, ...) {
-		if (missing(i) || (length(i) < 1) || is.na(i)) {
+		if (missing(i) || (length(i) < 1) || all(is.na(i))) {
 			return(new("DVH.list"))
 		}
 		if (all(is.logical(i))) {
