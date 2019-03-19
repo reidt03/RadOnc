@@ -29,5 +29,5 @@ RadOnc: An R Package for Analysis of Dose-Volume Histogram and Three-Dimensional
 \code{\link[RadOnc:DVH-class]{DVH}}, \code{\link[RadOnc:DVH.list-class]{DVH.list}}, \code{\link[RadOnc:structure3D-class]{structure3D}}, \code{\link[RadOnc:structure.list-class]{structure.list}}, \code{\link[RadOnc:RTdata-class]{RTdata}}
 }
 \examples{
-~~ See subdocumentation for detailed examples of important package functions ~~
+## See sub-documentation for detailed examples of important package functions ##
 }
