@@ -3,6 +3,22 @@
 \title{ RadOnc News }
 \encoding{UTF-8}
 
+
+\section{CHANGES IN VERSION 1.1.6}{
+
+  \subsection{NEW FEATURES}{
+    \itemize{
+      \item Added Aria v15 formatted DVH input functionality to \code{read.DVH()}
+    }
+  }
+
+  \subsection{ACKNOWLEDGEMENTS}{
+    \itemize{
+      \item Thank you to Jahan Mohiuddin for his help in supporting Aria v15 DVH export format.
+   }
+  }
+ }
+ 
 \section{CHANGES IN VERSION 1.1.5}{
 
   \subsection{NEW FEATURES}{
