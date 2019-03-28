@@ -1,5 +1,5 @@
 read.DVH <- function (file, type=NA, verbose=TRUE, collapse=TRUE, modality=NULL) {
-	type <- match.arg(tolower(type), choices=c(NA, "aria10", "aria11", "aria13", "aria8", "dicom", "cadplan", "tomo", "monaco", "raystation"), several.ok=TRUE)
+	type <- match.arg(tolower(type), choices=c(NA, "aria10", "aria11", "aria13", "aria15", "aria8", "dicom", "cadplan", "tomo", "monaco", "raystation"), several.ok=TRUE)
 	modality <- match.arg(modality, choices=c("CT", "MR"))
 	if (length(file) < 1) {
 		warning("argument 'file' is missing, with no default")
@@ -12,6 +12,7 @@ read.DVH <- function (file, type=NA, verbose=TRUE, collapse=TRUE, modality=NULL)
 			aria8 = return(read.DVH.Aria8(file=file, verbose=verbose)),
 			aria11 = return(read.DVH.Aria11(file=file, verbose=verbose)),
 			aria13 = return(read.DVH.Aria13(file=file, verbose=verbose)),
+			aria15 = return(read.DVH.Aria15(file=file, verbose=verbose)),
 			dicom = return(read.DVH.DICOM(path=file, verbose=verbose, modality=modality)),
 			cadplan = return(read.DVH.CadPlan(file=file, verbose=verbose)),
 			tomo = return(read.DVH.TomoTherapy(file=file, verbose=verbose)),
@@ -243,7 +244,7 @@ read.DVH.Aria13 <- function (file, verbose=TRUE) {
 		DVH.type <- "differential"
 	}
 	# EXTRACT PRESCRIPTION DOSE AND DOSE UNITS
-	dose.rx <- header[grep("^Prescribed dose.*: ", header, ignore.case=TRUE, perl=TRUE)]
+	dose.rx <- header[grep("^(Prescribed|Total) dose.*: ", header, ignore.case=TRUE, perl=TRUE)]
     dose.units <- toupper(sub("^.*[[](.*)[]].*", "\\1", dose.rx, perl=TRUE))
 
 	if (dose.units == "GY") {
@@ -252,7 +253,7 @@ read.DVH.Aria13 <- function (file, verbose=TRUE) {
 	else if (dose.units == "CGY") {
 		dose.units <- "cGy"
 	}
-	dose.rx <- suppressWarnings(as.numeric(sub("^Prescribed dose.*: ", "", dose.rx, ignore.case=TRUE, perl=TRUE)))
+	dose.rx <- suppressWarnings(as.numeric(sub("^(Prescribed|Total) dose.*: ", "", dose.rx, ignore.case=TRUE, perl=TRUE)))
     rx.isodose <- suppressWarnings(as.numeric(sub(".*: ", "", header[grep("^[%] for dose.*: ", header, ignore.case=TRUE, perl=TRUE)])))
     
 	if (verbose) {
@@ -345,6 +346,10 @@ read.DVH.Aria13 <- function (file, verbose=TRUE) {
 	# RETURN DVH LIST
 	names(DVH.list) <- unlist(lapply(DVH.list, names))
 	return(new("DVH.list", DVH.list))	
+}
+
+read.DVH.Aria15 <- function (file, verbose=TRUE) {
+	return(read.DVH.Aria13(file, verbose))
 }
 
 
