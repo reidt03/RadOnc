@@ -312,7 +312,12 @@ read.DVH.Aria13 <- function (file, verbose=TRUE) {
 			dose.max <- getDose(data[grep("^Max Dose.*: ", data, ignore.case=TRUE, perl=TRUE)])
 			dose.mean <- max(0, getDose(data[grep("^Mean Dose.*: ", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
 			if (verbose) {
-				cat("  ..Importing structure: ", name, "  [volume: ", volume, "cc, dose: ", dose.min, " - ", dose.max, dose.units, "]\n", sep="")
+				if(dose.type == "absolute") {
+					cat("  ..Importing structure: ", name, "  [volume: ", volume, "cc, dose: ", dose.min, " - ", dose.max, dose.units, "]\n", sep="")
+				}
+				else {
+					cat("  ..Importing structure: ", name, "  [volume: ", volume, "cc, dose: ", dose.min, " - ", dose.max, "%]\n", sep="")
+				}
 			}
 
 			dose.mode <- max(0, getDose(data[grep("^Modal Dose.*: ", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
