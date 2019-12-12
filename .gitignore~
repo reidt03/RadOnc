@@ -1,4 +1,3 @@
 # ignore Mac .DS_Store files
 .DS_Store
-# ignore R hidden files
 .Rapp.history
