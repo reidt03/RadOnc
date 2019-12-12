@@ -287,11 +287,11 @@ read.DICOM.RT <- function(path, exclude=NULL, recursive=TRUE, verbose=TRUE, limi
 		if (length(frame.ref.CT.i) > 1) {
 			frame.ref.CT.i <- frame.ref.CT.i[which(frame.ref.CT.i != "")]
 			if (length(unique(frame.ref.CT.i)) > 1) {
-				frame.ref.CT.i <- frame.ref.CT[1]
 				if (verbose) {
 					warning("Ambiguous reference frame in structure set file")
 				}
 			}
+			frame.ref.CT.i <- frame.ref.CT[1]
 		}		
 		if (length(frame.ref.CT.i) < 1) {
 			frame.ref.CT.i <- frame.ref.CT
@@ -389,7 +389,9 @@ read.DICOM.RT <- function(path, exclude=NULL, recursive=TRUE, verbose=TRUE, limi
 						return(NA)
 					}
 					x <- cbind(x[1:(length(x)/3)*3-2], x[1:(length(x)/3)*3-1], x[1:(length(x)/3)*3])
-					x[,2] <- sum(range(as.numeric(dimnames(CT)[[2]]))) - x[,2]
+					if (!is.null(CT)) {
+						x[,2] <- sum(range(as.numeric(dimnames(CT)[[2]]))) - x[,2]
+					}
 					return(x)
 				}
 			)			

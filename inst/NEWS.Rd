@@ -12,9 +12,16 @@
     }
   }
 
+  \subsection{BUG FIXES}{
+    \itemize{
+    	\item Fixes error handling structure import in absence of corresponding DICOM image.
+     }
+  }
+
   \subsection{ACKNOWLEDGEMENTS}{
     \itemize{
       \item Thank you to Jahan Mohiuddin for his help in supporting Aria v15 DVH export format.
+      \item Thank you to Gregory Smyth for identifying and reporting bug in structure set import.
    }
   }
  }
