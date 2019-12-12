@@ -2,3 +2,6 @@
 .DS_Store
 # ignore R hidden files
 .Rapp.history
+# ignore emacs files
+*~
+\#*\#
