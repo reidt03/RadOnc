@@ -10,14 +10,25 @@ read.DICOM.RT <- function(path, exclude=NULL, recursive=TRUE, verbose=TRUE, limi
 	if (! is.null(exclude)) {
     	filenames <- grep(exclude, filenames, ignore.case=TRUE, value=TRUE, invert=TRUE)
   	}
-  	if (length(filenames) < 1) {
+  	nfiles <- length(filenames)
+  	if (nfiles < 1) {
   		warning("No files to read from path '", path, "'", sep="")
   		return()
   	}
 	if (verbose) {
-		cat("Reading ", length(filenames), " DICOM files from path: '", path, "' ... ", sep="")
+		cat("Reading ", nfiles, " DICOM files from path: '", path, "' ... ", sep="")
 	}
-	DICOMs <- readDICOM(path, verbose=FALSE, exclude=exclude, recursive=recursive, ...)
+	DICOMs <- list()
+    for (i in 1:nfiles) {
+    	if (grepl("RTSTRUCT", filenames[i])) {
+			dcm <- readDICOMFile(filenames[i], pixelData=FALSE)
+    	}
+    	else {
+			dcm <- readDICOMFile(filenames[i], ...)
+    	}
+        DICOMs$img[[i]] <- dcm$img
+        DICOMs$hdr[[i]] <- dcm$hdr
+    }
 	
 	if (verbose) {
 		cat("FINISHED\nExtracting ", modality, " data ... ", sep="")
@@ -52,6 +63,8 @@ read.DICOM.RT <- function(path, exclude=NULL, recursive=TRUE, verbose=TRUE, limi
 		cat("ERROR (no ", modality, " data available)\n", sep="")
 		CT <- NULL
 		frame.ref.CT <- NA
+		patient.name <- NA
+		patient.ID <- NA
 	}
 	
 	if (length(which(modalities == "RTPLAN")) < 1) {
@@ -276,7 +289,7 @@ read.DICOM.RT <- function(path, exclude=NULL, recursive=TRUE, verbose=TRUE, limi
 		if (verbose) {
 			cat("Reading structure set from file: '", filenames[i], "' ... ", sep="")
 		}
-		DICOMs$hdr[[i]] <- DICOM.i <- readDICOMFile(filenames[i], skipSequence=FALSE)$hdr
+		DICOMs$hdr[[i]] <- DICOM.i <- readDICOMFile(filenames[i], skipSequence=FALSE, pixelData=FALSE)$hdr
 			
 		structures <- DICOM.i[which(DICOM.i[,"name"] %in% c("ROIName", "ROINumber")),]
 		N <- dim(structures)[1]/2
