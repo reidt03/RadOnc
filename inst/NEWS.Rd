@@ -9,12 +9,14 @@
   \subsection{NEW FEATURES}{
     \itemize{
       \item Added Aria v15 formatted DVH input functionality to \code{read.DVH()}
+      \item Added automatic filetype matching to \code{read.DVH()} in cases where \code{type} not specified
     }
   }
 
   \subsection{BUG FIXES}{
     \itemize{
     	\item Fixes error handling structure import in absence of corresponding DICOM image.
+      \item Fixes error important RayStation prescription dose in \code{read.DVH()}
      }
   }
 
@@ -22,6 +24,7 @@
     \itemize{
       \item Thank you to Jahan Mohiuddin for his help in supporting Aria v15 DVH export format.
       \item Thank you to Gregory Smyth for identifying and reporting bug in structure set import.
+      \item Thank you to Thomas Dilling for his help in supporting RayStation DVH import.
    }
   }
  }

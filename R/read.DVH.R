@@ -1,5 +1,6 @@
 read.DVH <- function (file, type=NA, verbose=TRUE, collapse=TRUE, modality=NULL) {
-	type <- match.arg(tolower(type), choices=c(NA, "aria10", "aria11", "aria13", "aria15", "aria8", "dicom", "cadplan", "tomo", "monaco", "raystation"), several.ok=TRUE)
+	types <- c("aria10", "aria11", "aria13", "aria15", "dicom", "cadplan", "tomo", "monaco", "raystation", "aria8")
+	type <- match.arg(tolower(type), choices=c(NA, types), several.ok=TRUE)
 	modality <- match.arg(modality, choices=c("CT", "MR"))
 	if (length(file) < 1) {
 		warning("argument 'file' is missing, with no default")
@@ -18,7 +19,22 @@ read.DVH <- function (file, type=NA, verbose=TRUE, collapse=TRUE, modality=NULL)
 			tomo = return(read.DVH.TomoTherapy(file=file, verbose=verbose)),
 			monaco = return(read.DVH.Monaco(file=file, verbose=verbose)),
 			raystation = return(read.DVH.RayStation(file=file, verbose=verbose)),
-			warning("DVH file format not specified for file '", file, "'")
+			{
+				warning("DVH file format not specified for file '", file, "'")
+				if (verbose) {
+					cat("Attempting to read DVH file ('", file, "')... ", sep="")
+				}
+				i <- 1
+				repeat {
+					if (i > length(types)) { break }
+					DVH <- try(read.DVH.file(file, types[i], verbose=FALSE), silent=TRUE)
+					if (!is.null(DVH) && (!inherits(DVH, "try-error"))) { return(DVH) }
+					i <- i+1
+				}
+				if (verbose) {
+					cat("ERROR\n")
+				}
+			}
 		)
 		return()
 	}		
@@ -40,10 +56,6 @@ read.DVH <- function (file, type=NA, verbose=TRUE, collapse=TRUE, modality=NULL)
 	else if (length(type) > length(file)) {
 		warning("length of 'file' and 'type' do not match")
 		type <- type[1:length(file)]	
-	}
-	if (all(is.na(type))) {
-		warning("'type' not specified")
-		return()
 	}
 	DVH.list <- mapply(function(x, y, z) {list(read.DVH.file(x, y, z))}, file, type, verbose)
     names(DVH.list) <- sapply(DVH.list, function(x) {if (is.null(x)) {return("")} else {paste(x[[1]]@ID, x[[1]]@patient, sep="_")}})
@@ -629,17 +641,18 @@ read.DVH.RayStation <- function (file, verbose=TRUE) {
     patient <- sub("^[#]PatientName.*:\\s*(.*)", "\\1", header[grep("^[#]PatientName.*:\\s*", header, ignore.case=TRUE, perl=TRUE)])
     ID <- sub("^[#]PatientId.*:\\s*(.*)", "\\1", header[grep("^[#]PatientId.*:\\s*", header, ignore.case=TRUE, perl=TRUE)])
 	plan <- sub("^[#]Dosename:\\s*(.+$)", "\\1", header[grep("^[#]Dosename:\\s*", header, ignore.case=TRUE, perl=TRUE)])
+
 	# EXTRACT PLAN DOSE (IN CGY)
 	if (grepl("Plan dose:", plan, ignore.case=TRUE)) {
-		dose.rx <- as.numeric(sub("^Plan dose:.+\\s([.0-9]+)c?Gy.*", "\\1", plan, perl=TRUE, ignore.case=TRUE))
-		if (toupper(sub("^Plan dose:.+\\s[.0-9]+(c?Gy).*", "\\1", plan, perl=TRUE, ignore.case=TRUE)) == "GY") {
+		dose.rx <- as.numeric(sub("^Plan dose:\\s*([.0-9]+)c?Gy.*", "\\1", plan, perl=TRUE, ignore.case=TRUE))
+		if (toupper(sub("^Plan dose:\\s*[.0-9]+(c?Gy).*", "\\1", plan, perl=TRUE, ignore.case=TRUE)) == "GY") {
 			dose.rx <- dose.rx * 100		
 		}
 	}
 	else {
 		dose.rx <- NA
 	}
-		
+
     # IDENTIFY STRUCTURES
     struct.start <- grep("^[#]RoiName:", data, perl=TRUE)
     struct.end <- struct.start + diff(c(struct.start, length(data)+1)) - 1
