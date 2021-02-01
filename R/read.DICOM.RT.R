@@ -369,6 +369,10 @@ read.DICOM.RT <- function(path, exclude=NULL, recursive=TRUE, verbose=TRUE, limi
 		for (j in 1:length(contour.seq)) {
 			structures.j <- structures[which(structures > contour.seq[j])]
 			structure.j <- structures.j[which.min(structures.j)]
+			if (length(structure.j) < 1) {
+				warning(paste("Structure formatting error in DICOM file", sep=""))
+				next
+			}
 			data.j <- strsplit(DICOM.i[intersect(contour.seq[j]:structure.j, contours), "value"], " ")
 			struct.ID.j <- which(structure.IDs == as.numeric(DICOM.i[structure.j, "value"]))
 #			if (DVH) {
@@ -462,7 +466,11 @@ read.DICOM.RT <- function(path, exclude=NULL, recursive=TRUE, verbose=TRUE, limi
 	for (i in 1:N) {
 		for (j in 1:length(data$name[[i]])) {
 			struct.i <- data$points[[i]][[j]]
-			if (length(unlist(struct.i, recursive=FALSE)) > limit) {
+			if (length(struct.i) < 1) {
+				struct.list <- c(struct.list, new("structure3D", name=paste(data$name[[i]][j], data$set[[i]])))
+				next
+			}
+			else if (length(unlist(struct.i, recursive=FALSE)) > limit) {
 				if (verbose) {
 					cat("  ", data$set[[i]], ": ", data$name[[i]][j], " [", length(struct.i), " axial slice(s), ", length(unlist(struct.i, recursive=FALSE))/3, " point(s)] ... skipped\n", sep="")
 				}

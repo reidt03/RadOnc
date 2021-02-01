@@ -17,8 +17,15 @@
     \itemize{
     	\item Fixes error handling structure import in absence of corresponding DICOM image.
       \item Fixes error important RayStation prescription dose in \code{read.DVH()}
+      \item Fixes error handling empty structure during DICOM import
      }
   }
+
+  \subsection{OTHER UPDATES}{
+    \itemize{
+      \item Suggests (rather than Depends) \code{rgl} package
+    }
+   }
 
   \subsection{ACKNOWLEDGEMENTS}{
     \itemize{
