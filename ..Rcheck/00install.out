@@ -1,8 +1,0 @@
-* installing *source* package ‘RadOnc’ ...
-** using staged installation
-** R
-** data
-*** moving datasets to lazyload DB
-** demo
-** inst
-** byte-compile and prepare package for lazy loading
