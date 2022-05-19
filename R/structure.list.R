@@ -86,7 +86,7 @@ setMethod("[[", "structure.list",
 setMethod("[[<-", "structure.list",
 	function (x, i, value) {
 		x <- attr(x,"structures")
-		if (class(value) == "structure3D") {
+		if (inherits(value,"structure3D")) {
 			x[[i]] <- value
 		}
 		else {

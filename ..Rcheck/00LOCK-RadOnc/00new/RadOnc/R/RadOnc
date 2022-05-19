@@ -1,0 +1,5465 @@
+.packageName <- "RadOnc"
+#line 1 "/Users/thompsre/RadOnc/R/CLASSES.R"
+############################################
+## CLASS: DVH
+############################################
+setClass("DVH",
+	representation(
+		patient = "character",
+		ID = "character",
+		structure.name = "character",
+		structure.volume = "numeric",
+		type = "character",
+		dose.max = "numeric",
+		dose.min = "numeric",
+		dose.mean = "numeric",
+		dose.median = "numeric",
+		dose.mode = "numeric",
+		dose.STD = "numeric",
+		conf.index = "numeric",
+		equiv.sphere = "numeric",
+		gradient = "numeric",
+		plan.sum = "logical",
+		dose.rx = "numeric",
+		dose.fx = "numeric",
+		rx.isodose = "numeric",
+		doses = "numeric",
+		dose.type = "character",
+		dose.units = "character",
+		volumes = "numeric",
+		volume.type = "character"
+	),
+	prototype(
+		patient = character(),
+		ID = character(),
+		structure.name = character(),
+		structure.volume = numeric(),
+		type = character(),
+		dose.max = numeric(),
+		dose.min = numeric(),
+		dose.mean = numeric(),
+		dose.median = numeric(),
+		dose.mode = numeric(),
+		dose.STD = numeric(),
+		conf.index = numeric(),
+		equiv.sphere = numeric(),
+		gradient = numeric(),
+		plan.sum = logical(),
+		dose.rx = numeric(),
+		dose.fx = numeric(),
+		rx.isodose = numeric(),
+		doses = numeric(),
+		dose.type = character(),
+		dose.units = character(),
+		volumes = numeric(),
+		volume.type = character()
+	)
+)
+
+setMethod("initialize",
+	"DVH",
+	function (.Object,
+		patient = "",
+		ID = "",
+		structure.name = "",
+		structure.volume = numeric(),
+		type = c("cumulative", "differential"),
+		dose.max = NA,
+		dose.min = NA,
+		dose.mean = numeric(),
+		dose.median = numeric(),
+		dose.mode = numeric(),
+		dose.STD = numeric(),
+		conf.index = numeric(),
+		equiv.sphere = numeric(),
+		gradient = numeric(),
+		plan.sum = FALSE,
+		dose.rx = NA,
+		dose.fx = numeric(),
+		rx.isodose = 100,
+		doses = numeric(),
+		dose.type = c("absolute", "relative"),
+		dose.units = c("cGy", "Gy"),
+		volumes = numeric(),
+		volume.type = c("relative", "absolute"),
+		...
+	) {
+		.Object@patient <- as.character(patient)
+		.Object@ID <- as.character(ID)
+		.Object@structure.name <- as.character(structure.name)
+		.Object@structure.volume <- max(0, as.numeric(structure.volume), na.rm=TRUE)
+		.Object@type <- match.arg(type)
+		if (length(doses) > 0) {
+			if (is.na(dose.max)) dose.max <- range(doses)[2]
+			if (is.na(dose.min)) dose.min <- range(doses)[1]			
+			.Object@doses <- doses	
+		}
+		else {
+			.Object@doses <- numeric()
+		}
+		.Object@dose.max <- max(0, dose.max, na.rm=TRUE)		
+		.Object@dose.min <- max(0, dose.min, na.rm=TRUE)
+		.Object@dose.mean <- max(0, dose.mean, na.rm=TRUE)
+		.Object@dose.median <- max(0, dose.median, na.rm=TRUE)
+		.Object@dose.mode <- max(0, dose.mode, na.rm=TRUE)
+		.Object@dose.STD <- max(0, dose.STD, na.rm=TRUE)
+		.Object@conf.index <- max(0, conf.index, na.rm=TRUE)
+		.Object@equiv.sphere <- max(0, equiv.sphere, na.rm=TRUE)
+		.Object@gradient <- max(0, gradient, na.rm=TRUE)
+		.Object@plan.sum <- plan.sum
+		.Object@dose.rx <- max(0, dose.rx, na.rm=FALSE)
+		.Object@dose.fx <- max(0, dose.fx, na.rm=TRUE)
+		if (is.na(rx.isodose)) rx.isodose <- 100
+		.Object@rx.isodose <- max(0, rx.isodose, na.rm=TRUE)
+		.Object@dose.type <- match.arg(dose.type)
+		.Object@dose.units <- match.arg(dose.units)
+		.Object@volume.type <- match.arg(volume.type)
+		if (length(volumes) > 0) {
+			.Object@volumes <- as.numeric(volumes)
+			if ((.Object@structure.volume <= 0) || (is.na(.Object@structure.volume))) {
+				if ((.Object@volume.type == "absolute") & (.Object@type == "differential")) {
+					.Object@structure.volume <- sum(.Object@volumes)
+				}
+				else if ((.Object@volume.type == "absolute") & (.Object@type == "cumulative")) {
+					.Object@structure.volume <- sum(-diff(.Object@volumes))
+				}
+				else {
+					warning("Cannot infer missing structure volume from relative volumetric data")
+				}
+				return(.Object)
+			}
+			if ((.Object@structure.volume < max(.Object@volumes, na.rm=TRUE)) & (.Object@volume.type == "absolute")) {
+				.Object@structure.volume <- max(.Object@volumes, na.rm=TRUE)
+			}
+		}
+		else {
+			.Object@volumes <- numeric()	
+		}
+		return(.Object)
+	}
+)
+
+
+setValidity("DVH",
+	function(object) {
+		if (length(object@doses) != length(object@volumes)) return(FALSE)
+		if (length(object@doses) == 0) return(TRUE)
+		if (any(is.na(object@doses))) return(FALSE)
+		if (!is.na(object@dose.rx) & (object@dose.rx <= 0)) return(FALSE)
+		if (!object@plan.sum & (is.na(object@rx.isodose) | (object@rx.isodose <= 0))) return(FALSE) 
+		if (object@dose.min > object@dose.max) return(FALSE)
+		if ((object@dose.mean > object@dose.max) | ((object@dose.mean < object@dose.min) & (object@dose.mean > 0))) return(FALSE)
+		if (!identical(order(object@doses, decreasing=FALSE), 1:length(object@doses))) return(FALSE)
+		if ((object@dose.type == "relative") & (range(object@doses, na.rm=TRUE)[2] > 250)) return(FALSE)
+		if (any(is.na(object@volumes))) return(FALSE)		
+		# ENSURE RELATIVE DVH VOLUMES ARE ON SCALE UP TO 100% MAXIMUM (VOLUME SHOULD NEVER BE >100%)		if ((object@volume.type == "relative") & (max(object@volumes, na.rm=TRUE) > 100.00000000001)) return(FALSE)	
+		# ENSURE STRUCTURE VOLUME IS SUFFICIENTLY LARGE TO ENCOMPASS ALL LISTED DVH INFORMATION	
+		if ((object@volume.type == "absolute") & (object@structure.volume < max(object@volumes, na.rm=TRUE))) return(FALSE)
+		# ENSURE CUMULATIVE DOSE HISTOGRAM HAS APPROPRIATE DATA (DOSE RANGE MUST START AT 0)	
+		# if ((object@type == "cumulative") & (object@doses[1] != 0)) return(FALSE)
+		# ENSURE STRUCTURE VOLUME AND DVH VOLUME DATA ARE EQUIVALENT (TOLERANCE=0.1%)
+		if (!grepl("(mean|median)[(].*[)]", object@structure.name)) {
+			if ((object@type == "differential") & (object@volume.type == "relative") & (abs(sum(object@volumes, na.rm=TRUE) - 100) > 0.1)) return(FALSE)
+			if ((object@type == "differential") & (object@volume.type == "absolute") & (abs(sum(object@volumes, na.rm=TRUE) - object@structure.volume) / object@structure.volume > 0.001)) return(FALSE)
+		}
+		return(TRUE)
+	}
+)
+
+
+############################################
+## CLASS: zDVH
+############################################
+setClass("zDVH",
+	contains="DVH"
+)
+
+
+setMethod("initialize",
+	"zDVH",
+	function (.Object,
+		patient = "",
+		ID = "",
+		structure.name = "",
+		structure.volume = numeric(),
+		type = c("cumulative", "differential"),
+		dose.max = NA,
+		dose.min = NA,
+		dose.mean = numeric(),
+		dose.median = numeric(),
+		dose.mode = numeric(),
+		dose.STD = numeric(),
+		conf.index = numeric(),
+		equiv.sphere = numeric(),
+		gradient = numeric(),
+		plan.sum = FALSE,
+		dose.rx = NA,
+		dose.fx = numeric(),
+		rx.isodose = 100,
+		doses = numeric(),
+		dose.type = c("absolute", "relative"),
+		dose.units = c("cGy", "Gy"),
+		volumes = matrix(nrow=0, ncol=0),
+		volume.type = c("relative", "absolute"),
+		...
+	) {
+		.Object@patient <- as.character(patient)
+		.Object@ID <- as.character(ID)
+		.Object@structure.name <- as.character(structure.name)
+		.Object@structure.volume <- max(0, as.numeric(structure.volume), na.rm=TRUE)
+		.Object@type <- match.arg(type)
+		if (length(doses) > 0) {
+			if (is.na(dose.max)) dose.max <- range(doses)[2]
+			if (is.na(dose.min)) dose.min <- range(doses)[1]			
+			.Object@doses <- doses	
+		}
+		else {
+			.Object@doses <- numeric()
+		}
+		.Object@dose.max <- max(0, dose.max, na.rm=TRUE)		
+		.Object@dose.min <- max(0, dose.min, na.rm=TRUE)
+		.Object@dose.mean <- max(0, dose.mean, na.rm=TRUE)
+		.Object@dose.median <- max(0, dose.median, na.rm=TRUE)
+		.Object@dose.mode <- max(0, dose.mode, na.rm=TRUE)
+		.Object@dose.STD <- max(0, dose.STD, na.rm=TRUE)
+		.Object@conf.index <- max(0, conf.index, na.rm=TRUE)
+		.Object@equiv.sphere <- max(0, equiv.sphere, na.rm=TRUE)
+		.Object@gradient <- max(0, gradient, na.rm=TRUE)
+		.Object@plan.sum <- plan.sum
+		.Object@dose.rx <- max(0, dose.rx, na.rm=FALSE)
+		.Object@dose.fx <- max(0, dose.fx, na.rm=TRUE)
+		if (is.na(rx.isodose)) rx.isodose <- 100
+		.Object@rx.isodose <- max(0, rx.isodose, na.rm=TRUE)
+		.Object@dose.type <- match.arg(dose.type)
+		.Object@dose.units <- match.arg(dose.units)
+		.Object@volume.type <- match.arg(volume.type)
+		class(volumes) <- c("numeric", "matrix")
+		if (is.null(colnames(volumes))) {
+			colnames(volumes) <- 1:(dim(volumes)[2])
+		}
+		.Object@volumes <- volumes
+		if (length(volumes) > 0) {
+			if ((length(.Object@structure.volume) < 1) || (is.na(.Object@structure.volume)) || (.Object@structure.volume < max(.Object@volumes, na.rm=TRUE))) {
+				if ((.Object@volume.type == "absolute") & (.Object@type == "differential")) {
+					.Object@structure.volume <- sum(.Object@volumes)
+				}
+				else if ((.Object@volume.type == "absolute") & (.Object@type == "cumulative")) {
+					.Object@structure.volume <- sum(-apply(.Object@volumes, 2, diff))
+				}
+				else {
+					warning("Cannot infer missing structure volume from relative volumetric data")
+				}
+				return(.Object)
+			}
+		}
+		return(.Object)
+	}
+)
+
+
+setValidity("zDVH",
+	function(object) {
+		if (!is.matrix(object@volumes)) return(FALSE)
+		if (length(object@doses) != dim(object@volumes)[1]) return(FALSE)
+		if (is.null(colnames(object@volumes))) return(FALSE)
+		if (length(object@doses) == 0) return(TRUE)
+#		if (length(object@doses) < 2) return(FALSE)
+		if (any(is.na(object@doses))) return(FALSE)
+		if (!is.na(object@dose.rx) & (object@dose.rx <= 0)) return(FALSE)
+		if (!object@plan.sum & (is.na(object@rx.isodose) | (object@rx.isodose <= 0))) return(FALSE) 
+		if (object@dose.min > object@dose.max) return(FALSE)
+		if ((object@dose.mean > object@dose.max) | (object@dose.mean < object@dose.min)) return(FALSE)
+		if (!identical(order(object@doses, decreasing=FALSE), 1:length(object@doses))) return(FALSE)
+		if ((object@dose.type == "relative") & (range(object@doses, na.rm=TRUE)[2] > 250)) return(FALSE)		
+		if (any(is.na(object@volumes))) return(FALSE)		
+		# ENSURE RELATIVE DVH VOLUMES ARE ON SCALE UP TO 100% MAXIMUM (VOLUME SHOULD NEVER BE >100%)		if ((object@volume.type == "relative") & (max(object@volumes, na.rm=TRUE) > 100.00000000001)) return(FALSE)	
+		# ENSURE STRUCTURE VOLUME IS SUFFICIENTLY LARGE TO ENCOMPASS ALL LISTED DVH INFORMATION	
+		if ((object@volume.type == "absolute") & (object@structure.volume < max(object@volumes, na.rm=TRUE))) return(FALSE)
+		# ENSURE CUMULATIVE DOSE HISTOGRAM HAS APPROPRIATE DATA (DOSE RANGE MUST START AT 0)	
+		# if ((object@type == "cumulative") & (object@doses[1] != 0)) return(FALSE)
+		# ENSURE STRUCTURE VOLUME AND DVH VOLUME DATA ARE EQUIVALENT (TOLERANCE=0.1%)
+		if (!grepl("(mean|median)[(].*[)]", object@structure.name)) {
+			if ((object@type == "differential") & (object@volume.type == "relative") & (abs(sum(object@volumes, na.rm=TRUE) - 100) > 0.1)) return(FALSE)
+			if ((object@type == "differential") & (object@volume.type == "absolute") & (abs(sum(object@volumes, na.rm=TRUE) - object@structure.volume) / object@structure.volume > 0.001)) return(FALSE)
+		}
+		return(TRUE)
+	}
+)
+
+
+############################################
+## CLASS: DVH.list
+############################################
+setClass("DVH.list",
+	representation(
+		structures = "list"
+	),
+	prototype(
+		structures = list()
+	)
+)
+
+
+setMethod("initialize",
+	"DVH.list",
+	function (.Object,
+		structures = list(),
+		...
+	) {
+		if ((length(structures) == 1) & (class(structures) %in% c("DVH", "zDVH"))) {
+			structures <- list(structures)
+		}
+		DVHs <- which(unlist(lapply(structures, class)) %in% c("DVH", "zDVH"))
+		if (length(DVHs) >= 1) {
+			.Object@structures <- structures[DVHs]
+		}
+		else {
+			.Object@structures <- list()
+		}
+		return(.Object)
+	}
+)
+
+setValidity("DVH.list",
+	function(object) {
+		if (length(object) == 0) return(TRUE)
+		if (!all(unlist(lapply(object, class)) %in% c("DVH", "zDVH"))) return(FALSE)
+		return(TRUE)
+	}
+)
+
+
+############################################
+## CLASS: structure3D
+############################################
+setClass("structure3D",
+	representation(
+		name = "character",
+		volume = "numeric",
+		volume.units = "character",
+		coordinate.units = "character",
+		vertices = "matrix",
+		origin = "numeric",
+		triangles = "matrix",
+		closed.polys = "matrix",
+		DVH = "DVH"
+	),
+	prototype(
+		name = character(),
+		volume = numeric(),
+		volume.units = character(),
+		coordinate.units = character(),
+		vertices = matrix(),
+		origin = numeric(),
+		triangles = matrix(),
+		closed.polys = matrix(),
+		DVH = new("DVH")
+	)
+)
+
+setMethod("initialize",
+	"structure3D",
+	function(.Object,
+		name = "",
+		volume = NULL,
+		volume.units = c("cc"),
+		coordinate.units = c("cm", "mm"),
+		vertices = matrix(nrow=0, ncol=3),
+		origin = NULL,
+		triangles = matrix(nrow=3, ncol=0),
+		closed.polys = matrix(nrow=0, ncol=3),
+		DVH = new("DVH")
+	) {
+		.Object@name <- as.character(name)
+		if (is.null(volume)) {
+			.Object@volume <- 0
+			# calculate volume of structure3D
+			# .Object@volume <- as.numeric(volume)
+		}
+		else {
+			.Object@volume <- as.numeric(volume)		
+		}		
+		if (is.null(vertices)) {
+			vertices <- matrix(nrow=0, ncol=3)
+		}
+		if (is.null(closed.polys)) {
+			closed.polys <- matrix(nrow=0, ncol=3)
+		}
+		if (is.null(origin)) {
+			if (dim(vertices)[1] <= 1) {
+				origin <- as.numeric(vertices)
+			}
+			else {
+				origin <- apply(vertices, 2, mean)
+			}
+		}
+		if (length(origin) != 3) {
+			.Object@origin <- c(0, 0, 0)
+		}
+		else {
+			.Object@origin <- origin
+		}
+		volume.units <- match.arg(volume.units)
+		.Object@volume.units <- as.character(volume.units)
+		coordinate.units <- match.arg(coordinate.units)
+		.Object@coordinate.units <- as.character(coordinate.units)
+		.Object@vertices <- as.matrix(vertices)
+		.Object@triangles <- as.matrix(triangles)
+		.Object@closed.polys <- as.matrix(closed.polys)
+		return(.Object)
+	}
+)
+
+setValidity("structure3D",
+	function(object) {
+		if (object@volume < 0) return(FALSE)
+		if (!is.matrix(object@vertices)) return(FALSE)
+		if (!is.matrix(object@triangles)) return(FALSE)
+		if (dim(object@vertices)[2] != 3) return(FALSE)
+		if (dim(object@triangles)[1] != 3) return(FALSE)
+		if (length(object@origin) != 3) return(FALSE)
+		if ((dim(object@triangles)[2] > 0) & (dim(object@vertices)[1] == 0)) return(FALSE)
+#		if ((dim(object@vertices)[1] > 0) & (dim(object@triangles)[2] == 0)) return(FALSE)
+		if ((dim(object@vertices)[1] > 0) & (dim(object@triangles)[2] > 0)) {
+			range.triangles <- suppressWarnings(range(object@triangles))
+			if (range.triangles[1] < 1) return(FALSE)
+			if (range.triangles[2] > dim(object@vertices)[1]) return(FALSE)			
+		}
+		return(validObject(object@DVH))
+	}
+)
+
+############################################
+## CLASS: structure.list
+############################################
+setClass("structure.list",
+	representation(
+		structures = "list"
+	),
+	prototype(
+		structures = list()
+	)
+)
+
+
+setMethod("initialize",
+	"structure.list",
+	function (.Object,
+		structures = list(),
+		...
+	) {
+		if ((length(structures) == 1) & (class(structures) == "structure3D")) {
+			structures <- list(structures)
+		}
+		structs <- which(unlist(lapply(structures, class)) == "structure3D")
+		if (length(structs) >= 1) {
+			.Object@structures <- structures[structs]
+		}
+		else {
+			.Object@structures <- list()
+		}
+		return(.Object)
+	}
+)
+
+
+setValidity("structure.list",
+	function(object) {
+		if (!is.list(object)) return(FALSE)
+		if (length(object) == 0) return(TRUE)
+		if (!all(unlist(lapply(structures, class)) == "structure3D")) return(FALSE)
+		return(TRUE)
+	}
+)
+
+
+############################################
+## CLASS: RTdata
+############################################
+setClass("RTdata",
+	representation(
+		name = "character",
+		CT = "array",
+		dose = "array",
+		structures = "structure.list"
+	),
+	prototype(
+		name = character(),
+		CT = array(dim=c(0,0,0)),
+		dose = array(dim=c(0,0,0)),
+		structures = new("structure.list")
+	)
+)
+
+setMethod("initialize",
+	"RTdata",
+	function (.Object,
+		name = character(),
+		CT = array(dim=c(0,0,0)),
+		dose = array(dim=c(0,0,0)),
+		dose.units = character(),
+		structures = new("structure.list"),
+		...
+	) {
+		.Object@name <- name
+		if (class(CT) != "array") {
+			CT <- array(dim=c(0,0,0))
+		}
+		.Object@CT <- CT
+		if (class(dose) != "array") {
+			dose <- array(dim=c(0,0,0))
+		}
+		.Object@dose <- dose
+		attr(.Object@dose, "dose.units") <- character()
+		if (class(structures) == "structure.list") {
+			.Object@structures <- structures
+		}
+		else {
+			.Object@structures <- new("structure.list")
+		}
+		return(.Object)
+	}
+)
+
+setValidity("RTdata",
+	function(object) {
+		if (class(object@CT) != "array") return(FALSE)
+		if (length(dim(object@CT)) != 3) return(FALSE)
+		if (class(object@dose) != "array") return(FALSE)
+		if (length(dim(object@dose)) != 3) return(FALSE)
+		if (is.null(attr(object@dose, "dose.units"))) return(FALSE)
+		if (any(dim(object@dose) > 0) & (!attr(object@dose, "dose.units") %in% c("cGy", "Gy"))) return(FALSE)
+		if (class(object@structures) != "structure.list") return(FALSE)
+		return(TRUE)
+	}
+)
+
+
+############################################
+## INITIALIZE COMMON GENERIC FUNCTIONS
+############################################
+setGeneric("print",
+	print
+)
+
+setGeneric("as.list",
+	as.list
+)
+
+setGeneric("lapply",
+	lapply
+)
+
+setGeneric("rev",
+	rev
+)
+#line 1 "/Users/thompsre/RadOnc/R/DVH.R"
+setAs("structure3D", "DVH", 
+	function(from) {
+		return(from$DVH)
+	}
+)
+
+setAs("zDVH", "DVH", 
+	function(from) {
+		from$volumes <- apply(from$volumes, 1, sum)
+		class(from$volumes) <- "numeric"
+		class(from) <- "DVH"
+		return(from)
+	}
+)
+
+
+setMethod("$", "DVH",
+	function (x, name) {
+		if (inherits(try(slot(x, name), silent=TRUE), "try-error")) {
+			return(NULL)	
+		}
+		else {
+			return(slot(x, name))	
+		}
+	}
+)
+
+setMethod("names", "DVH",
+	function (x) {
+		return(x$structure.name)
+	}
+)
+
+setMethod("names<-", "DVH",
+ 	function (x, value) {
+ 		x$structure.name <- value
+ 		return(x)
+ 	}
+)
+
+setMethod("$<-", "DVH",
+	function (x, name, value) {
+		if (inherits(try(slot(x, name), silent=TRUE), "try-error")) {
+			warning("'", name, "' is not a parameter in class 'DVH'")
+		}
+		else {
+			slot(x, name) <- value
+		}
+		return(x)
+	}
+)
+
+setMethod("[", "DVH",
+	function (x, i, ...) {
+		if (!validObject(x)) {
+			stop("not a valid object of 'DVH'")
+		}
+		if (!missing(i)) {
+			if (is.null(i)) return(NULL)
+			if (length(i) < 1) return(numeric())
+			if (is.logical(i)) {
+				if (length(i) != length(x@doses)) {
+					stop("(subscript 'i') logical subscript does not match length of 'DVH' doses")
+				}
+				i <- which(i)
+			}
+			result <- c()
+			result.units <- c()
+			i <- input <- toupper(as.character(i))
+			type <- sub("(V|D).*", "\\1", i)
+			volume <- grepl("VOL", i)
+			if (any(volume)) {
+				type[volume] <- "VOLUME"
+			}
+			patients <- grepl("PATIENT", i)
+			if (any(patients)) {
+				type[patients] <- "PATIENT"
+			}
+			IDs <- grepl("ID", i)
+			if (any(IDs)) {
+				type[IDs] <- "ID"
+			}
+			value <- sub("[VD]([-<.0-9]+|MAX|MIN|MEAN|MEDIAN|RX|INTEGRAL).*", "\\1", i)
+			type2 <- sub("[VD]([-<.0-9]+|MAX|MIN|MEAN|MEDIAN|RX|INTEGRAL)([%]|GY|CGY|CC)*.*$", "\\2", i)
+			type3 <- grepl(".*[(](.*)[)]$", i)
+			type4 <- sub(".*[(](.*)[)]$", "\\1", i)
+			type5 <- grepl("[-<]", value)
+			type6 <- grepl(" (=|==|<=|>=|<|>|!=) [.0-9]+", i)
+			type7 <- sub(".* (=|==|<=|>=|<|>|!=) [.0-9]+.*", "\\1", i)
+			type8 <- suppressWarnings(as.numeric(sub(".* (=|==|<=|>=|<|>|!=) ([.0-9]+).*([(].*[)])*$", "\\2", i)))
+			for (count in 1:length(i)) {
+				switch(type[count],
+					PATIENT = {
+						result <- c(result, x$patient)
+						result.units <- c(result.units, "")	
+					},
+					ID = {
+						result <- c(result, x$ID)
+						result.units <- c(result.units, "")	
+					},
+					VOLUME = {
+						if (type4[count] == "%") {
+							result <- c(result, 100)	
+							result.units <- c(result.units, "%")		
+						}
+						else {
+							result <- c(result, x@structure.volume)
+							result.units <- c(result.units, "cc")
+						}
+					},
+					V = {
+						if (type5[count]) {
+							values <- suppressWarnings(as.numeric(unlist(strsplit(value[count], "[-<]"))))
+							if (length(values) != 2) {
+								warning("Improper format '", input[count], "' (dose must be specified as numeric range, e.g. 'V10-20Gy' or 'V<500cGy')")
+								result <- c(result, NA)
+								result.units <- c(result.units, NA)
+								next
+							}
+							if (is.na(values[1])) {
+								values[1] <- 0
+							}
+							if (x@type == "differential") {
+								values <- convert.DVH(x, type="cumulative")[paste("V", values, type2[count], if (type3[count]) { paste("(", type4[count], ")", sep="")}, sep="")]
+							}
+							else {
+								values <- x[paste("V", values, type2[count], if (type3[count]) { paste("(", type4[count], ")", sep="")}, sep="")]
+							}
+							result <- c(result, as.numeric(values[1])-as.numeric(values[2]))
+							result.units <- c(result.units, names(values)[1])
+							next
+						}
+						else {
+							value[count] <- suppressWarnings(as.numeric(value[count]))
+						}
+						if (is.na(value[count])) {
+							warning("Improper format '", input[count], "' (dose must be numeric, e.g. 'V20Gy')")
+							result <- c(result, NA)
+							result.units <- c(result.units, NA)
+							next
+						}
+						if (length(x@doses) < 1) {
+							warning("Empty DVH data")
+							result <- c(result, NA)
+							result.units <- c(result.units, NA)
+							next
+						}
+						switch(x@type,
+							cumulative = {
+								switch(x@dose.type,
+									absolute = {
+										switch(type2[count],
+											CGY = if (x@dose.units == "cGy") { TRUE } else { value[count] <- as.numeric(value[count]) / 100 },
+											"%" = value[count] <- as.numeric(value[count]) * x@dose.rx / x@rx.isodose,
+											GY = if (x@dose.units == "Gy") { TRUE } else { value[count] <- as.numeric(value[count]) * 100 },
+											CC = value[count] <- NA,
+											value[count] <- NA
+										)
+									},
+									relative = {
+										switch(type2[count],
+											"%" = TRUE,
+											GY = if (x@dose.units == "Gy") { value[count] <- as.numeric(value[count]) * x@rx.isodose / x@dose.rx } else { value[count] <- (as.numeric(value[count]) * x@rx.isodose / x@dose.rx) * 100 },
+											CGY = if (x@dose.units == "cGy") { value[count] <- as.numeric(value[count]) * x@rx.isodose / x@dose.rx } else { value[count] <- as.numeric(value[count]) * x@rx.isodose * 0.01 / x@dose.rx },
+											CC = value[count] <- NA,
+											value[count] <- NA
+										)
+									},
+									value[count] <- NA
+								)
+								if (is.na(value[count])) {
+									warning("Improper format '", input[count], "' (should specify dose as % or cGy or Gy, e.g. 'V20Gy')")
+									result <- c(result, NA)
+									result.units <- c(result.units, NA)
+									next
+								}
+								switch(type4[count],
+									"%" = {
+										if (x@volume.type == "absolute") {
+											result <- c(result, 100 * approx(x@doses, x@volumes, value[count], yright=0, ties=max)$y / x@structure.volume)
+										}
+										else {
+											result <- c(result, approx(x@doses, x@volumes, value[count], yright=0, ties=max)$y)
+										}
+										result.units <- c(result.units, "%")										
+									},
+									CC = {
+										if (x@volume.type == "relative") {
+											result <- c(result, approx(x@doses, x@volumes, value[count], yright=0, ties=max)$y * x@structure.volume / 100)
+										}
+										else {
+											result <- c(result, approx(x@doses, x@volumes, value[count], yright=0, ties=max)$y)
+										}
+										result.units <- c(result.units, "cc")
+									},
+									{
+										if (type3[count]) {
+											warning("Improper format '", input[count], "' (should specify output volume as % or cc, e.g. 'V__(cc)')")
+										}
+										if (x@volume.type == "absolute") {
+											result <- c(result, approx(x@doses, x@volumes, value[count], yright=0, ties=max)$y)
+											result.units <- c(result.units, "cc")
+										}
+										else {
+											result <- c(result, approx(x@doses, x@volumes, value[count], yright=0, ties=max)$y)
+											result.units <- c(result.units, "%")										
+										}
+									}
+								)
+							},
+							differential = {
+								warning("No method available to extract volume given differential doses")
+								result <- c(result, NA)
+								result.units <- c(result.units, NA)
+							}
+						)
+					},
+					D = {
+						switch(x@type,
+							cumulative = {
+								if (value[count] %in% c("MAX", "MIN", "MEAN", "MEDIAN", "RX")) {
+									switch(value[count],
+										MAX = value[count] <- x@dose.max,
+										MIN = value[count] <- x@dose.min,
+										MEAN = value[count] <- x@dose.mean,
+										MEDIAN = value[count] <- x@dose.median,
+										RX = if (x@dose.type == "absolute") { value[count] <- x@dose.rx } else { value[count] <- 100 * 100 / x@rx.isodose }
+									)
+									if ((type2[count] == "%") | (type4[count] == "%")) {
+										if (x@dose.type == "relative") {
+											result <- c(result, as.numeric(value[count]))
+										}
+										else {
+											result <- c(result, as.numeric(value[count]) * x@rx.isodose / x@dose.rx)
+										}
+										result.units <- c(result.units, "%")
+									}
+									else if (type4[count] == "CGY") {
+										if (x@dose.type == "relative") {
+											value[count] <- as.numeric(value[count]) * x@dose.rx / x@rx.isodose
+										}
+										if (x@dose.units == "Gy") {
+											result <- c(result, as.numeric(value[count]) * 100)
+										}
+										else {
+											result <- c(result, as.numeric(value[count]))
+										}
+										result.units <- c(result.units, "cGy")
+									}
+									else if (type4[count] == "GY") {
+										if (x@dose.type == "relative") {
+											value[count] <- as.numeric(value[count]) * x@dose.rx / x@rx.isodose
+										}
+										if (x@dose.units == "cGy") {
+											result <- c(result, as.numeric(value[count]) / 100)
+										}
+										else {
+											result <- c(result, as.numeric(value[count]))
+										}
+										result.units <- c(result.units, "Gy")
+									}
+									else {
+										if (type3[count]) {
+											warning("Improper format '", input[count], "' (should specify output dose as %, cGy or Gy, e.g. 'Dmax(cGy)')")
+										}
+										result <- c(result, as.numeric(value[count]))
+										result.units <- c(result.units, x@dose.units)
+									}
+									next
+								}
+								if (length(x@doses) < 1) {
+									warning("Empty DVH data")
+									result <- c(result, NA)
+									result.units <- c(result.units, NA)
+									next
+								}																
+								if (value[count] == "INTEGRAL") {
+									if (type3[count]) {
+										if (grepl("(>|<)[.0-9]+([%]|GY|CGY)*$", type4[count])) {
+											if (grepl(">", type4[count])) {
+												start.i <- as.numeric(sub("(>|<)([.0-9]+)([%]|GY|CGY)*$", "\\2", type4[count]))
+												end.i <- Inf
+											}
+											else {
+												start.i <- 0
+												end.i <- as.numeric(sub("(>|<)([.0-9]+)([%]|GY|CGY)*$", "\\2", type4[count]))
+											}
+
+											units.i <- sub("(>|<)[-.0-9]+([%]|GY|CGY)$", "\\2", type4[count])
+										}
+										else if (grepl("[.0-9]+-[.0-9]+([%]|GY|CGY)*$", type4[count])) {
+											start.i <- as.numeric(sub("([.0-9]+)[-].*", "\\1", type4[count]))
+											end.i <- as.numeric(sub(".*[-]([.0-9]+)[^.0-9]*", "\\1", type4[count]))
+											if (end.i < start.i) {
+												units.i <- end.i
+												end.i <- start.i
+												start.i <- units.i
+											}
+											units.i <- sub("[-.0-9]+([%]|GY|CGY)$", "\\1", type4[count])
+										}
+										else {
+											start.i <- 0
+											end.i <- Inf
+											units.i <- ""
+										}
+									}
+									else {
+										start.i <- 0
+										end.i <- Inf
+										units.i <- ""
+									}
+									switch(units.i,
+										CGY = y <- convert.DVH(x, volume="absolute", dose="absolute", dose.units="cGy"),
+										GY = y <- convert.DVH(x, volume="absolute", dose="absolute", dose.units="Gy"),
+										"%" = y <- convert.DVH(x, volume="absolute", dose="relative"),
+										y <- convert.DVH(x, volume="absolute", dose="absolute")
+									)
+									dose.bins <- diff(y@doses)
+									y <- convert.DVH(y, type="differential")
+									start.i <- max(start.i, min(y))				
+									end.i <- min(end.i, max(y))				
+									if (units.i == "%") {
+										result <- c(result,
+											y@dose.rx * max(0, integrate(function(dose) {
+												return(approx(y@doses, y@volumes*y@doses/dose.bins, dose, yleft=0, yright=0, ties=max)$y)
+												}, start.i, end.i, stop.on.error=FALSE, abs.tol=0, rel.tol=100*.Machine$double.eps
+											)$value) / y@rx.isodose
+										)
+									}
+									else {
+										result <- c(result,
+											max(0, integrate(function(dose) {
+												return(approx(y@doses, y@volumes*y@doses/dose.bins, dose, yleft=0, yright=0, ties=max)$y)
+												}, start.i, end.i, stop.on.error=FALSE, abs.tol=0, rel.tol=100*.Machine$double.eps
+											)$value)
+										)
+									}
+									result.units <- c(result.units, paste(y@dose.units, "*cc", sep=""))
+									next
+								}
+								value[count] <- suppressWarnings(as.numeric(value[count]))
+								if (is.na(value[count])) {
+									warning("Improper format '", input[count], "' (volume must be numeric, e.g. 'D20%')")
+									result <- c(result, NA)
+									result.units <- c(result.units, NA)
+									next
+								}
+								switch(x@volume.type,
+									absolute = {
+										switch(type2[count],
+											CC = TRUE,
+											"%" = value[count] <- as.numeric(value[count]) * x@structure.volume / 100,
+											GY = value[count] <- NA,
+											CGY = value[count] <- NA,
+											value[count] <- NA
+										)									
+									},
+									relative = {
+										switch(type2[count],
+											"%" = TRUE,
+											CC = value[count] <- as.numeric(value[count]) * 100 / x@structure.volume,
+											GY = value[count] <- NA,
+											CGY = value[count] <- NA,
+											value[count] <- NA
+										)
+									}
+								)
+								value.count <- as.numeric(value[count])
+								if (is.na(value.count)) {
+									warning("Improper format '", input[count], "' (should specify volume as % or cc, e.g. 'D__%')")
+									result <- c(result, NA)
+									result.units <- c(result.units, NA)
+									next
+								}
+								else {
+									switch(type4[count],
+										"%" = {
+											if (value.count > 100) {
+												warning("Requested value for volume '", input[count], "' exceeds 100%")
+											}
+											if (value.count < 0) {
+												warning("Requested value for volume '", input[count], "' is less than 0%")
+											}
+											result <- c(result, x@rx.isodose * min(x@dose.max, max(x@dose.min, approx(x@volumes, x@doses, value.count, ties=max)$y, na.rm=TRUE), na.rm=TRUE) / x@dose.rx)
+											result.units <- c(result.units, "%")										
+										},
+										CGY = {
+											if (x@dose.units == "Gy") {
+												result <- c(result, min(x@dose.max, max(x@dose.min, approx(x@volumes, x@doses, value.count, ties=max)$y, na.rm=TRUE), na.rm=TRUE) * 100)
+											}
+											else {
+												result <- c(result, min(x@dose.max, max(x@dose.min, approx(x@volumes, x@doses, value.count, ties=max)$y, na.rm=TRUE), na.rm=TRUE))
+											}
+											result.units <- c(result.units, "cGy")
+										},
+										GY = {
+											if (x@dose.units == "cGy") {
+												result <- c(result, min(x@dose.max, max(x@dose.min, approx(x@volumes, x@doses, value.count, ties=max)$y, na.rm=TRUE), na.rm=TRUE) / 100) 
+											}
+											else {
+												result <- c(result, min(x@dose.max, max(x@dose.min, approx(x@volumes, x@doses, value.count, ties=max)$y, na.rm=TRUE), na.rm=TRUE))
+											}
+											result.units <- c(result.units, "Gy")
+										},
+										{
+											if (type3[count]) {
+												warning("Improper format '", input[count], "' (should specify output dose as %, cGy or Gy, e.g. 'D__(cGy)')")
+											}
+											result <- c(result, min(x@dose.max, max(x@dose.min, approx(x@volumes, x@doses, value.count, ties=max)$y, na.rm=TRUE), na.rm=TRUE))	
+											if (x@dose.type == "absolute") {
+												result.units <- c(result.units, x@dose.units)
+											}
+											else {
+												result.units <- c(result.units, "%")										
+											}
+										}		
+									)
+								}
+							},
+							differential = {
+								if (length(x@doses) < 1) {
+									warning("Empty DVH data")
+									result <- c(result, NA)
+									result.units <- c(result.units, NA)
+									next
+								}								
+								if (value[count] == "INTEGRAL") {
+									if (type3[count]) {
+										if (grepl("(>|<)[.0-9]+([%]|GY|CGY)*$", type4[count])) {
+											if (grepl(">", type4[count])) {
+												start.i <- as.numeric(sub("(>|<)([.0-9]+)([%]|GY|CGY)*$", "\\2", type4[count]))
+												end.i <- Inf
+											}
+											else {
+												start.i <- 0
+												end.i <- as.numeric(sub("(>|<)([.0-9]+)([%]|GY|CGY)*$", "\\2", type4[count]))
+											}
+
+											units.i <- sub("(>|<)[-.0-9]+([%]|GY|CGY)$", "\\2", type4[count])
+										}
+										else if (grepl("[.0-9]+-[.0-9]+([%]|GY|CGY)*$", type4[count])) {
+											start.i <- as.numeric(sub("([.0-9]+)[-].*", "\\1", type4[count]))
+											end.i <- as.numeric(sub(".*[-]([.0-9]+)[^.0-9]*", "\\1", type4[count]))
+											if (end.i < start.i) {
+												units.i <- end.i
+												end.i <- start.i
+												start.i <- units.i
+											}
+											units.i <- sub("[-.0-9]+([%]|GY|CGY)$", "\\1", type4[count])
+										}
+										else {
+											start.i <- 0
+											end.i <- Inf
+											units.i <- ""
+										}
+									}
+									else {
+										start.i <- 0
+										end.i <- Inf
+										units.i <- ""
+									}
+									switch(units.i,
+										CGY = y <- convert.DVH(x, volume="absolute", dose="absolute", dose.units="cGy"),
+										GY = y <- convert.DVH(x, volume="absolute", dose="absolute", dose.units="Gy"),
+										"%" = y <- convert.DVH(x, volume="absolute", dose="relative"),
+										y <- convert.DVH(x, volume="absolute", dose="absolute")
+									)
+									# may be flawed if bin widths variable!!!
+									bin.widths <- median(diff(y@doses))
+									start.i <- max(start.i, min(y))				
+									end.i <- min(end.i, max(y))				
+									if (units.i == "%") {
+										result <- c(result,
+											y@dose.rx * max(0, integrate(function(dose) {
+												return(approx(y@doses, y@volumes*y@doses/bin.widths, dose, yleft=0, yright=0, ties=max)$y)
+												}, start.i, end.i, stop.on.error=FALSE, abs.tol=0, rel.tol=100*.Machine$double.eps
+											)$value) / y@rx.isodose
+										)
+									}
+									else {
+										result <- c(result,
+											max(0, integrate(function(dose) {
+												return(approx(y@doses, y@volumes*y@doses/bin.widths, dose, yleft=0, yright=0, ties=max)$y)
+												}, start.i, end.i, stop.on.error=FALSE, abs.tol=0, rel.tol=100*.Machine$double.eps
+											)$value)
+										)
+									}
+									result.units <- c(result.units, paste(y@dose.units, "*cc", sep=""))
+									next
+								}
+								warning("No method available to extract dose given differential doses")
+								result <- c(result, NA)
+								result.units <- c(result.units, NA)
+							}
+						)
+						
+					},
+					{
+						warning("Improper format '", input[count], "' (dose/volume specifier missing, e.g. 'V__' or 'D__')")
+						result <- c(result, NA)
+						result.units <- c(result.units, NA)
+					}
+				)
+			}
+			if (any(type6)) {
+				for (count in which(type6)) {
+					switch(type7[count],
+						"==" = result[count] <- as.logical(result[count] == type8[count]),
+						"=" = result[count] <- as.logical(result[count] == type8[count]),
+						"<=" = result[count] <- as.logical(result[count] <= type8[count]),
+						">=" = result[count] <- as.logical(result[count] >= type8[count]),
+						"<" = result[count] <- as.logical(result[count] < type8[count]),
+						">" = result[count] <- as.logical(result[count] > type8[count]),
+						"!=" = result[count] <- as.logical(result[count] != type8[count])
+					)	
+					result.units[count] <- "logical"					
+				}				
+			}
+		}
+		else {
+			return()
+		}
+		names(result) <- result.units
+		return(result)
+	}
+)
+
+
+setMethod("c", "DVH",
+	function (x, ..., recursive = FALSE) {
+		return(c(as(x, "DVH.list"), ..., recursive=recursive))
+	}
+)
+
+setMethod("sum", "DVH",
+	function (x, ..., na.rm = TRUE) {
+		return(sum(as(x, "DVH.list"), ..., na.rm = na.rm))
+	}
+)
+
+setMethod("print", "DVH",
+	function (x, ...) {
+		if (x@dose.type == "relative") {
+			dose.type <- "%"
+			dose.min <- x@dose.min * x@rx.isodose / x@dose.rx
+			dose.max <- x@dose.max * x@rx.isodose / x@dose.rx
+		}
+		else {
+			dose.type <- x@dose.units
+			dose.min <- x@dose.min
+			dose.max <- x@dose.max
+		}
+		print(paste("Structure: ", x@structure.name, " (", sprintf("%.*f", 1, x@structure.volume), "cc), Dose: ", sprintf("%.*f", 2, dose.min), "-", sprintf("%.*f", 2, dose.max), dose.type, " (", x@dose.rx, x@dose.units, " prescribed", if (x@rx.isodose != 100) {paste(" to ", x@rx.isodose, "% isodose line", sep="")}, "), DVH: ", x@type, ", Volume: ", x@volume.type, sep=""))
+	}
+)
+
+setMethod("show", "DVH",
+	function (object) {
+		print(object)
+	}
+)
+
+is.empty <- function (x) {
+	if ((length(x@doses) < 1) & (x@structure.volume == 0)) {
+		return(TRUE)
+	}
+	else {
+		return(FALSE)
+	}
+}
+#line 1 "/Users/thompsre/RadOnc/R/DVH.list.R"
+
+setMethod("as.list", "DVH.list",
+	function(x, ...) {
+		return(attr(x,"structures"))
+	}
+)
+
+setAs("DVH", "DVH.list", 
+	function(from) {
+		return(new("DVH.list", structures=from))
+	}
+)
+
+setAs("zDVH", "DVH.list", 
+	function(from) {
+		return(new("DVH.list", structures=from))
+	}
+)
+
+setAs("structure.list", "DVH.list", 
+	function(from) {
+		return(new("DVH.list", lapply(from, function(struct) {return(struct$DVH)})))
+	}
+)
+
+setAs("list", "DVH.list", 
+	function(from) {
+		DVH.list.combined <- new("DVH.list")
+		lapply(from, function (DVH.list) {
+			DVH.list.combined <<- c(DVH.list.combined, DVH.list)
+		})
+		return(DVH.list.combined)
+	}
+)
+
+setMethod("lapply", "DVH.list",
+	function (X, FUN, ...) {
+    	X <- as.list(X)
+    	.Internal(lapply(X, FUN))
+	}
+)
+
+
+setMethod("length", "DVH.list",
+	function (x) {
+		return(length(attr(x,"structures")))
+	}
+)
+
+
+setMethod("[", "DVH.list",
+	function (x, i, ...) {
+		if (missing(i) || (length(i) < 1) || all(is.na(i))) {
+			return(new("DVH.list"))
+		}
+		if (all(is.logical(i))) {
+			x <- attr(x,"structures")
+			return(new("DVH.list", x[i]))
+		}
+		if (suppressWarnings(all(!is.na(as.numeric(i))))) {
+			x <- attr(x,"structures")
+			return(new("DVH.list", x[as.numeric(i)]))
+		}
+		if (length(i) == 1) {
+			x <- attr(x,"structures")
+			if (grepl("(\\*|\\^|\\$|\\?|\\+|[[]|[{]|\\|)", i)) {
+				return(new("DVH.list", x[grep(i, unlist(lapply(x, names)))]))
+			}
+			else if (is.character(i)) {
+				return(new("DVH.list", x[which(unlist(lapply(x, names)) == i)]))					
+			}
+			else if (is.logical(i)) {
+				return(new("DVH.list", x[i]))
+			}
+			else if (suppressWarnings(!is.na(as.numeric(i)))) {
+				return(new("DVH.list", x[i]))
+			}
+			else {
+				return(new("DVH.list", x[i]))
+			}			
+		}
+		return(c(x[i[1]], x[i[2:length(i)]]))
+	}
+)
+
+setMethod("$", "DVH.list",
+	function (x, name) {
+		name <- unlist(strsplit(name, ","))
+		return(lapply(x, function (DVH) { DVH[name] }))		
+	}
+)
+
+
+setMethod("[[", "DVH.list",
+	function (x, i, exact=TRUE) {
+		x <- attr(x,"structures")
+		return(x[[i]])
+	}
+)
+
+setMethod("[[<-", "DVH.list",
+	function (x, i, value) {
+		x <- attr(x,"structures")
+		if (class(value) %in% c("DVH", "zDVH")) {
+			x[[i]] <- value
+		}
+		else {
+			stop("'value' must be an object of class 'DVH' or 'zDVH'")
+		}
+		return(new("DVH.list", x))
+	}
+)
+
+setMethod("c", "DVH.list",
+	function (x, ..., recursive = FALSE) {
+		return(new("DVH.list", c(as.list(x), as.list(c(... , recursive=recursive)), recursive=recursive)))
+	}
+)
+
+setMethod("rev", "DVH.list",
+	function (x) {
+		if (length(x) <= 1) {
+			return(x)
+		}
+		else {
+			return(x[length(x):1])
+		}
+	}
+)
+
+setMethod("print", "DVH.list",
+	function (x, ...) {
+		print(paste("List containing ", length(x), " DVH objects (", paste(names(x), collapse=", ", sep=""), ")", sep=""))
+	}
+)
+
+setMethod("show", "DVH.list",
+	function (object) {
+		print(object)
+	}
+)
+
+setMethod("names", "DVH.list",
+	function (x) {
+		return(as.character(unlist(lapply(x, names))))
+	}
+)
+
+setMethod("names<-", "DVH.list",
+ 	function (x, value) {
+		if (length(x) != length(value)) {
+			stop(paste("'names' attribute [", length(value), "] must be the same length as the DVH list [", length(x), "]", sep=""))
+		}
+		DVHlist <- new("DVH.list", mapply(function(DVH, name) {
+				DVH$structure.name <- name
+				return(DVH)
+			},
+			x, value
+		))
+		names(attr(DVHlist,"structures")) <- value		
+		return(DVHlist)
+  	}
+)
+#line 1 "/Users/thompsre/RadOnc/R/LQE.R"
+setGeneric("LQE",
+	function (x, aB, ...) {
+		standardGeneric("LQE") 
+	}
+)
+
+setMethod("LQE", c("ANY", "missing"),
+	function (x, aB, ...) {
+		stop("argument 'aB' is missing, with no default")
+	}
+)
+
+setMethod("LQE", c("numeric", "numeric"),
+	function (x, aB, fractions=NULL, N=NULL, dose.units=c("cGy", "Gy")) {
+		dose.units <- match.arg(dose.units)
+		if (is.null(fractions)) {
+			if (is.null(N)) {
+				warning("arguments 'fractions' and 'N' are missing, with no default")	
+				return(NA)	
+			}
+			else {
+				fractions <- N
+				dose.units <- paste(dose.units, "N", sep="")
+			}
+		}
+		if (length(fractions) != 2) {
+			warning("argument 'fractions' must be of length two")
+			return(NA)
+		}
+		if (any(fractions <= 0)) {
+			warning("argument 'fractions' must specify two positive numeric values")
+			return(NA)
+		}
+		if (length(aB) < 1) {
+			warning("argument 'aB' is of zero length")
+			return(NA)
+		}
+		if (aB == 0) {
+			warning("argument 'aB' must be non-zero")
+			return(NA)
+		}
+		switch(dose.units,
+			cGy = {
+				return(x * (0.01 * fractions[1] + aB) / (0.01 * fractions[2] + aB))
+			},
+			Gy = {
+				return(x * (fractions[1] + aB) / (fractions[2] + aB))				
+			},
+			cGyN = {
+				return(suppressWarnings(unlist(lapply(x, 
+					function (dose) {
+						dose <- as.numeric(polyroot(c(-dose * (0.01 * dose / fractions[1] + aB), aB, 0.01 / fractions[2])))
+						return(dose[dose >= 0])
+					}
+ 				))))
+			},
+			GyN = {
+				return(suppressWarnings(unlist(lapply(x, 
+					function (dose) {
+						dose <- as.numeric(polyroot(c(-dose * (dose / fractions[1] + aB), aB, 1 / fractions[2])))
+						return(dose[dose >= 0])
+					}
+ 				))))
+			}			
+		)
+	}
+)
+
+setMethod("LQE", c("DVH", "numeric"),
+	function (x, aB, fractions=NULL, N=NULL, dose.units=c("cGy", "Gy")) {
+		dose.units <- match.arg(dose.units)
+		if (is.empty(x)) {
+			warning("argument 'x' is an empty DVH")
+			return(NA)
+		}
+		x <- convert.DVH(x, dose="absolute", dose.units=dose.units)
+		if (is.null(fractions)) {
+			if (is.null(N)) {
+				warning("arguments 'fractions' and 'N' are both missing, with no default")	
+				return(NA)	
+			}
+			else {
+				fractions <- N
+				dose.units <- paste(dose.units, "N", sep="")
+			}
+		}
+		if ((length(fractions) != 1) || (fractions <= 0)) {
+			warning("argument 'fractions' must specify a single positive numeric value")	
+			return(NA)	
+		}
+		if (length(aB) < 1) {
+			warning("argument 'aB' is of zero length")
+			return(NA)
+		}
+		else if (length(aB) > 1) {
+			warning(paste("length of 'aB' exceeds length of 'x', will use single value for aB=",aB[1], sep=""))
+			aB <- aB[1]
+		}
+		if (aB == 0) {
+			warning("argument 'aB' must be non-zero")
+			return(NA)
+		}
+		switch(dose.units,
+			cGy = {
+				if ((x$dose.fx == 0) || (x$dose.fx == x$dose.rx / fractions)) {
+					x$dose.fx <- x$dose.rx / fractions
+					return(x)
+				}				
+				LQE.calc <- function (doses) {
+					return(doses * (0.01 * doses / x$dose.fx + aB) / (0.01 * fractions * doses / x$dose.rx + aB))
+				}		
+			},
+			Gy = {
+				if ((x$dose.fx == 0) || (x$dose.fx == x$dose.rx / fractions)) {
+					x$dose.fx <- x$dose.rx / fractions
+					return(x)
+				}				
+				LQE.calc <- function (doses) {
+					return(doses * (doses / x$dose.fx + aB) / (fractions * doses / x$dose.rx + aB))
+				}		
+			},
+			cGyN = {
+				if ((x$dose.fx == 0) || (x$dose.fx == fractions)) {
+					x$dose.fx <- fractions
+					return(x)
+				}				
+				LQE.calc <- function (doses) {
+					return(suppressWarnings(unlist(lapply(doses, 
+						function (dose) {
+							dose <- as.numeric(polyroot(c(-dose * (0.01 * dose / x$dose.fx + aB), aB, 0.01 / fractions)))
+							return(dose[dose >= 0])
+						}
+ 					))))
+				}		
+			},
+			GyN = {
+				if ((x$dose.fx == 0) || (x$dose.fx == fractions)) {
+					x$dose.fx <- fractions
+					return(x)
+				}		
+				LQE.calc <- function (doses) {
+					return(suppressWarnings(unlist(lapply(doses, 
+						function (dose) {
+							dose <- as.numeric(polyroot(c(-dose * (dose / x$dose.fx + aB), aB, 1 / fractions)))
+							return(dose[dose >= 0])
+						}
+ 					))))
+				}		
+			}
+		)
+		x$doses <- LQE.calc(x$doses)
+		x$dose.max <- LQE.calc(x$dose.max)
+		x$dose.min <- LQE.calc(x$dose.min)
+		x$dose.mean <- LQE.calc(x$dose.mean)
+		x$dose.median <- LQE.calc(x$dose.median)
+		x$dose.mode <- LQE.calc(x$dose.mode)
+		x$dose.STD <- LQE.calc(x$dose.STD)
+		x$dose.rx <- LQE.calc(x$dose.rx)
+		x$dose.fx <- fractions		
+		return(x) 
+	}
+)
+
+setMethod("LQE", c("DVH.list", "numeric"),
+	function (x, aB, fractions=NULL, N=NULL, dose.units=NULL) {
+		dose.units <- match.arg(dose.units, choices=c("cGy","Gy"), several.ok=TRUE)
+		if (length(dose.units) != length(x)) {
+			if (length(dose.units) > 1) {
+				warning(paste("length of 'x' and 'dose.units' do not match, will use single value for dose.units=",dose.units[1], sep=""))
+			}
+			dose.units <- rep(dose.units[1], length(x))
+		}
+		if (length(aB) != length(x)) {
+			if (length(aB) > 1) {
+				warning(paste("length of 'x' and 'aB' do not match, will use single value for aB=",aB[1], sep=""))
+			}
+			aB <- rep(aB[1], length(x))
+		}
+		if (length(fractions) != length(x)) {
+			if (length(fractions) > 1) {
+				warning(paste("length of 'x' and 'fractions' do not match, will use single value for fractions=",fractions[1], sep=""))
+			}
+			else if (length(fractions) < 1) {
+				if (length(N) != length(x)) {
+					if (length(N) > 1) {
+						warning(paste("length of 'x' and 'N' do not match, will use single value for N=",N[1], sep=""))
+					}
+					else if (length(N) < 1) {
+						warning("arguments 'fractions' and 'N' are both missing, with no default")	
+						return(NA)	
+					}
+					N <- rep(N[1], length(x))				
+				}
+				return(new("DVH.list", mapply(LQE, x, aB=aB, N=N, dose.units=dose.units)))			
+			}
+			fractions <- rep(fractions[1], length(x))
+		}
+		return(new("DVH.list", mapply(LQE, x, aB=aB, fractions=fractions, dose.units=dose.units)))
+	}
+)
+#line 1 "/Users/thompsre/RadOnc/R/RTdata.R"
+setMethod("print", "RTdata",
+	function (x, ...) {
+		contents <- c()
+		if (any(dim(slot(x, "CT")) > 0)) {
+			contents <- c(contents, paste("CT image (", paste(dim(slot(x, "CT")), collapse="x", sep=""), ")", sep=""))
+		}
+		if (any(dim(slot(x, "dose")) > 0)) {
+			contents <- c(contents, paste("dose grid (", paste(dim(slot(x, "dose")), collapse="x", sep=""), ")", sep=""))
+		}
+		if (length(slot(x, "structures")) > 0) {
+			contents <- c(contents, paste(length(slot(x, "structures")), "structure(s)"))
+		}
+		if (length(contents) == 0) {
+			print("Empty RT dataset")
+		}
+		else {
+			print(paste("RT data '", slot(x, "name"), "' containing ", paste(contents, collapse=", ", sep=""), sep=""))
+		}
+	}
+)
+
+
+setMethod("show", "RTdata",
+	function (object) {
+		print(object)
+	}
+)
+
+
+setMethod("$", "RTdata",
+	function (x, name) {
+		if (inherits(try(slot(x, name), silent=TRUE), "try-error")) {
+			warning("'", name, "' is not a parameter in class 'RTdata'")
+			return(NULL)	
+		}
+		else {
+			return(slot(x, name))	
+		}
+	}
+)
+
+
+setMethod("names", "RTdata",
+	function (x) {
+		return(x$name)
+	}
+)
+
+
+setMethod("names<-", "RTdata",
+ 	function (x, value) {
+ 		x$name <- value
+ 		return(x)
+ 	}
+)
+
+
+setMethod("$<-", "RTdata",
+	function (x, name, value) {
+		if (inherits(try(slot(x, name), silent=TRUE), "try-error")) {
+			warning("'", name, "' is not a parameter in class 'RTdata'")
+		}
+		else {
+			slot(x, name) <- value
+		}
+		return(x)
+	}
+)
+#line 1 "/Users/thompsre/RadOnc/R/approx3D.R"
+approx3D <- function(data, x, y=NULL, z=NULL, method=c("trilinear"), extrapolate=FALSE) {
+	method <- match.arg(method)
+	if ((length(x) == 3) & is.null(y) & is.null(z)) {
+		z <- as.numeric(x[3])
+		y <- as.numeric(x[2])
+		x <- as.numeric(x[1])
+	}
+	if (is.matrix(x) & is.null(y) & is.null(z)) {
+		if (dim(x)[2] == 3) {
+			z <- as.numeric(x[,3])
+			y <- as.numeric(x[,2])
+			x <- as.numeric(x[,1])
+		}
+	}
+	if (length(x) != length(y)) {
+		stop("'x' and 'y' lengths differ")
+	}
+	if (length(x) != length(z)) {
+		stop("'x' and 'z' lengths differ")
+	}
+	if (length(x) < 1) {
+		return()
+	}
+	x.coord <- as.numeric(dimnames(data)[[1]])
+	y.coord <- as.numeric(dimnames(data)[[2]])
+	z.coord <- as.numeric(dimnames(data)[[3]])
+	## FUNCTION ASSUMES THAT GRID SPACING IS EVEN IN THE X, Y, AND Z DIRECTIONS
+	x.diff <- abs(x.coord[2]-x.coord[1])
+	y.diff <- abs(y.coord[2]-y.coord[1])
+	z.diff <- abs(z.coord[2]-z.coord[1])
+	if (!extrapolate) {
+		x[x < min(x.coord)] <- NA
+		x[x > max(x.coord)] <- NA
+		y[y < min(y.coord)] <- NA
+		y[y > max(y.coord)] <- NA
+		z[z < min(z.coord)] <- NA
+		z[z > max(z.coord)] <- NA
+	}
+	else {
+		x <- pmax(x, min(x.coord))
+		x <- pmin(x, max(x.coord))
+		y <- pmax(y, min(y.coord))
+		y <- pmin(y, max(y.coord))
+		z <- pmax(z, min(z.coord))
+		z <- pmin(z, max(z.coord))
+	}
+	x.unique <- unique(x)
+	x.unique.data <- lapply(x.unique,
+		function(x) {
+			if (x %in% x.coord) {
+				return(list(coords=rep(which(x.coord == x), 2), dist=0))
+			}
+			else {
+				coords <- order(abs(x.coord-x))[1:2]
+				return(list(coords=coords, dist=abs((x-x.coord[coords[1]])/x.diff)))
+			}
+		}
+	)
+	y.unique <- unique(y)
+	y.unique.data <- lapply(y.unique,
+		function(y) {
+			if (y %in% y.coord) {
+				return(list(coords=rep(which(y.coord == y), 2), dist=0))
+			}
+			else {
+				coords <- order(abs(y.coord-y))[1:2]
+				return(list(coords=coords, dist=abs((y-y.coord[coords[1]])/y.diff)))
+			}
+		}
+	)
+	names(y.unique.data) <- y.unique
+	z.unique <- unique(z)
+	z.unique.data <- lapply(z.unique,
+		function(z) {
+			if (z %in% z.coord) {
+				return(list(coords=rep(which(z.coord == z), 2), dist=0))
+			}
+			else {
+				coords <- order(abs(z.coord-z))[1:2]
+				return(list(coords=coords, dist=abs((z-z.coord[coords[1]])/z.diff)))
+			}
+		}
+	)
+	# TRILINEAR INTERPOLATION METHOD
+	if (method == "trilinear") {
+		data <- mapply(function(x, y, z) {
+				x.i <- x.unique.data[[which(x.unique == x)]]
+				y.i <- y.unique.data[[which(y.unique == y)]]
+				z.i <- z.unique.data[[which(z.unique == z)]]
+				data.xyz <- data[x.i$coords, y.i$coords, z.i$coords]
+				data.xyz <- data.xyz[2,,]*x.i$dist + data.xyz[1,,]*(1-x.i$dist)
+				data.xyz <- data.xyz[2,]*y.i$dist + data.xyz[1,]*(1-y.i$dist)
+				return(as.numeric(data.xyz[2]*z.i$dist + data.xyz[1]*(1-z.i$dist)))
+			},
+			x, y, z
+		)
+		return(unlist(data))
+	}
+	else {
+		warning("Only trilinear interpolation method currently supported")
+		return(NA)
+	}
+} 
+#line 1 "/Users/thompsre/RadOnc/R/calculate.DVH.R"
+setGeneric("calculate.DVH",
+	function (x, dose, ...) {
+		standardGeneric("calculate.DVH") 
+	}
+)
+
+setMethod("calculate.DVH", c("RTdata", "missing"),
+	function (x, dose, resolution.xyz=c(0.2,0.2,NA), resolution.dose=0.01, method=NULL, dose.units=NULL) {
+		return(calculate.DVH(x$structures, x$dose, resolution.xyz, resolution.dose, method, dose.units))
+	}
+)
+
+setMethod("calculate.DVH", c("RTdata", "array"),
+	function (x, dose, resolution.xyz=c(0.2,0.2,NA), resolution.dose=0.01, method=NULL, dose.units=NULL) {
+		return(calculate.DVH(x$structures, dose, resolution.xyz, resolution.dose, method, dose.units))
+	}
+)
+
+setMethod("calculate.DVH", c("structure3D", "array"),
+	function(x, dose, resolution.xyz=c(0.2,0.2,NA), resolution.dose=0.01, method=NULL, dose.units=NULL) {
+		method <- match.arg(method, choices=c("ATC", "surface", "axial"))	
+		switch(method,
+			ATC = return(calc.DVH.ATC(x, dose, resolution.xyz, resolution.dose, dose.units)),
+			surface = return(calc.DVH.surface(x, dose, resolution.xyz, resolution.dose, dose.units)),
+			axial = return(calc.DVH.axial(x, dose, resolution.xyz, resolution.dose, dose.units)),
+			{
+				warning("Inappropriate method selection (", method, ")")
+				return()
+			}
+		)
+	}
+)
+
+setMethod("calculate.DVH", c("structure.list", "array"),
+	function(x, dose, resolution.xyz=c(0.2,0.2,NA), resolution.dose=0.01, method=NULL, dose.units=NULL) {
+		method <- match.arg(method, choices=c("ATC", "surface", "axial"))	
+		switch(method,
+			ATC = {
+				return(as(lapply(x, function(structure) {
+					return(calc.DVH.ATC(structure, dose, resolution.xyz, resolution.dose, dose.units))
+				}), "DVH.list"))				
+			},
+			surface = {
+				return(as(lapply(x, function(structure) {
+					return(calc.DVH.surface(structure, dose, resolution.xyz, resolution.dose, dose.units))
+				}), "DVH.list"))
+			},
+			axial = {
+				return(as(lapply(x, function(structure) {
+					return(calc.DVH.axial(structure, dose, resolution.xyz, resolution.dose, dose.units))
+				}), "DVH.list"))
+			},
+			{
+				warning("Inappropriate method selection (", method, ")")
+				return()
+			}
+		)
+	}
+)
+
+setMethod("calculate.DVH", c("ANY", "missing"),
+	function (x, dose, ...) {
+		warning("Argument 'dose' is missing with no default")
+		return()
+	}
+)
+
+setMethod("calculate.DVH", c("ANY", "array"),
+	function (x, dose, ...) {
+		warning("Argument 'x' is not an object of class structure3D, structure.list, or RTdata")
+		return()
+	}
+)
+
+setMethod("calculate.DVH", c("ANY", "ANY"),
+	function (x, dose, ...) {
+		warning("Improper input(s) 'x' and/or 'dose', please refer to RadOnc package documentation for further information")
+		return()
+	}
+)
+
+
+calc.DVH.ATC <- function(x, dose, resolution.xyz=c(0.2,0.2,NA), resolution.dose=0.01, dose.units=NULL) {
+#	reference is Straube and Matthews and Bosche and Prudy 2005 (DVH Analysis: consequences for quality assurance of multi-insitutional clinial trials)
+#	placeholder for implementation of multiple DVH calculation algorithms (currrently implemented algorithm makes use of evenly spaced voxel grid and tests every point to see whether or not inside every slice on axial-by-axial basis -- note that this assumes "straight walls" i.e. stepwise surface, no angles/curves between z slices)
+#	next step will be to take 3D surface and interpolate dose along z direction as well!!!!
+#   also consider different bounding box for each slice?  or use same larger bounding box for overall?  I'll implement both ways and do a timing test to see which one compares better . . . keep current function as-is as baseline check to see performance difference!!!!!!!!!
+	if (length(attr(dose, "dose.units")) > 0) {
+		dose.units <- attr(dose, "dose.units")	
+	}
+	dose.units <- match.arg(dose.units, choices=c("cGy", "Gy"))	
+	if (length(x$closed.polys) < 1) {
+		warning("Structure '", names(x), "' is empty (it contains no pre-defined axial slices)")	
+		return()	
+	}
+	if (dim(x$vertices)[1] <= 2) {
+		warning("Structure '", names(x), "' must contain at least three points to calculate a DVH")	
+		return()	
+	}
+	dose.xrange <- range(as.numeric(dimnames(dose)[[1]]), na.rm=TRUE)
+	dose.yrange <- range(as.numeric(dimnames(dose)[[2]]), na.rm=TRUE)
+	dose.zrange <- range(as.numeric(dimnames(dose)[[3]]), na.rm=TRUE)
+	range.struct <- range(x)
+	if (any(is.na(range.struct))) {
+		warning("Structure '", names(x), "' contains undefined points (coordinate range is undefined)")
+		return()
+	}
+	if ((range.struct[1,1] < dose.xrange[1]) | (range.struct[2,1] > dose.xrange[2]) | 
+		(range.struct[1,2] < dose.yrange[1]) | (range.struct[2,2] > dose.yrange[2]) |
+		(range.struct[1,3] < dose.zrange[1]) | (range.struct[2,3] > dose.zrange[2])) {
+			warning("Structure '", names(x), "' extends beyond calculated dose grid")
+			return()
+	}
+	z.unique <- sort(unique(x$vertices[,3]))
+	if (is.na(resolution.xyz[3])) {
+		resolution.xyz[3] <- median(abs(diff(z.unique)))
+	}
+	offset.x <- ((range.struct[2,1]-range.struct[1,1]) %% resolution.xyz[1]) / 2
+	if (is.na(offset.x)) {
+		warning("Structure '", names(x), "' is not three-dimensional (all points coplanar along x-axis)")
+		return()
+	}
+	xseq <- seq(from=range.struct[1,1]+offset.x, to=range.struct[2,1]-offset.x, by=resolution.xyz[1])
+	N.x <- length(xseq)
+	offset.y <- ((range.struct[2,2]-range.struct[1,2]) %% resolution.xyz[2]) / 2
+	if (is.na(offset.x)) {
+		warning("Structure '", names(x), "' is not three-dimensional (all points coplanar along y-axis)")
+		return()
+	}
+	yseq <- seq(from=range.struct[1,2]+offset.y, to=range.struct[2,2]-offset.y, by=resolution.xyz[2])
+	N.y <- length(yseq)
+	poly.z <- unlist(lapply(x$closed.polys, function(poly) {return(poly[1,3])}))
+	N.z <- length(z.unique)
+	if (dose.units == "cGy") {
+		resolution.dose <- resolution.dose * 100
+	}
+	doses <- seq(from=min(dose), to=max(dose), by=resolution.dose)
+	voxels <- c()
+	for (i in z.unique) {
+		poly.i <- which(poly.z == i)
+		# TEST WHETHER EACH POINT IN GRID IS CONTAINED WITHIN POLYGON(S)
+		pts.xyz <- cbind(rep(xseq, each=N.y), rep(yseq, N.x), i)
+		results <- rep(0, N.x*N.y)
+		lapply(x$closed.polys[poly.i], function(poly) {
+			results <<- results+pointInPoly2D(pts.xyz[,1:2], poly[,1:2])
+		})
+		pts.xyz <- pts.xyz[which(results %%2 != 0),]
+		# CALCULATE (INTERPOLATE) DOSES FOR EACH POINT CONTAINED IN STRUCTURE
+		dose.xyz <- approx3D(dose, pts.xyz)
+		voxels <- c(voxels, dose.xyz)
+	}
+	dvh <- hist(voxels, breaks=c(doses, max(dose)),plot=FALSE,right=FALSE)$counts*prod(resolution.xyz)/1000
+	dvh.volume <- sum(dvh)
+	return(new("DVH", type="differential", dose.type="absolute", volume.type="absolute", structure.volume=dvh.volume, doses=doses, volumes=dvh, dose.max=max(voxels,na.rm=TRUE), dose.min=min(voxels,na.rm=TRUE), dose.mean=sum(dvh*doses)/dvh.volume, dose.units=dose.units, structure.name=names(x)))
+}
+
+
+calc.DVH.surface <- function(x, dose, resolution.xyz=c(0.2,0.2,NA), resolution.dose=0.01, dose.units=NULL) {
+	if (length(x$triangles) < 1) {
+		warning("Structure '", names(x), "' contains no pre-defined triangular mesh")	
+		return()	
+	}
+	if (length(attr(dose, "dose.units")) > 0) {
+		dose.units <- attr(dose, "dose.units")	
+	}
+	dose.units <- match.arg(dose.units, choices=c("cGy", "Gy"))	
+	warning("calculate.DVH(..., method='surface') not currently supported")
+	return()
+}
+
+calc.DVH.axial <- function(x, dose, resolution.xyz=c(0.2,0.2,NA), resolution.dose=0.01, dose.units=NULL) {
+#	reference is Straube and Matthews and Bosche and Prudy 2005 (DVH Analysis: consequences for quality assurance of multi-insitutional clinial trials)
+#	placeholder for implementation of multiple DVH calculation algorithms (currrently implemented algorithm makes use of evenly spaced voxel grid and tests every point to see whether or not inside every slice on axial-by-axial basis -- note that this assumes "straight walls" i.e. stepwise surface, no angles/curves between z slices)
+#	next step will be to take 3D surface and interpolate dose along z direction as well!!!!
+#   also consider different bounding box for each slice?  or use same larger bounding box for overall?  I'll implement both ways and do a timing test to see which one compares better . . . keep current function as-is as baseline check to see performance difference!!!!!!!!!
+	if (length(attr(dose, "dose.units")) > 0) {
+		dose.units <- attr(dose, "dose.units")	
+	}
+	dose.units <- match.arg(dose.units, choices=c("cGy", "Gy"))	
+	if (length(x$closed.polys) < 1) {
+		warning("Structure '", names(x), "' is empty (it contains no pre-defined axial slices)")	
+		return()	
+	}
+	dose.xrange <- range(as.numeric(dimnames(dose)[[1]]), na.rm=TRUE)
+	dose.yrange <- range(as.numeric(dimnames(dose)[[2]]), na.rm=TRUE)
+	dose.zrange <- range(as.numeric(dimnames(dose)[[3]]), na.rm=TRUE)
+	range.struct <- range(x)
+	if ((range.struct[1,1] < dose.xrange[1]) | (range.struct[2,1] > dose.xrange[2]) | 
+		(range.struct[1,2] < dose.yrange[1]) | (range.struct[2,2] > dose.yrange[2]) |
+		(range.struct[1,3] < dose.zrange[1]) | (range.struct[2,3] > dose.zrange[2])) {
+			warning("Structure '", names(x), "' extends beyond calculated dose grid")
+			return()
+	}
+	z.unique <- sort(unique(x$vertices[,3]))
+	if (is.na(resolution.xyz[3])) {
+		resolution.xyz[3] <- median(abs(diff(z.unique)))
+	}
+	offset.x <- ((range.struct[2,1]-range.struct[1,1]) %% resolution.xyz[1]) / 2
+	xseq <- seq(from=range.struct[1,1]+offset.x, to=range.struct[2,1]-offset.x, by=resolution.xyz[1])
+	N.x <- length(xseq)
+	offset.y <- ((range.struct[2,2]-range.struct[1,2]) %% resolution.xyz[2]) / 2
+	yseq <- seq(from=range.struct[1,2]+offset.y, to=range.struct[2,2]-offset.y, by=resolution.xyz[2])
+	N.y <- length(yseq)
+#	offset.z <- ((range.struct[2,3]-range.struct[1,3]) %% resolution.xyz[3]) / 2
+#	zseq <- seq(from=range.struct[1,3]+offset.z, to=range.struct[2,3]-offset.z, by=resolution.xyz[3])
+#	N.z <- length(zseq)
+	poly.z <- unlist(lapply(x$closed.polys, function(poly) {return(poly[1,3])}))
+	N.z <- length(z.unique)
+	if (dose.units == "cGy") {
+		resolution.dose <- resolution.dose * 100
+	}
+	doses <- seq(from=min(dose), to=max(dose), by=resolution.dose)
+	dose.min <- Inf
+	dose.max <- -Inf
+	dvh.matrix <- matrix(nrow=length(doses),ncol=0)
+	for (i in z.unique) {
+		poly.i <- which(poly.z == i)
+		# TEST WHETHER EACH POINT IN GRID IS CONTAINED WITHIN POLYGON(S)
+		pts.xyz <- cbind(rep(xseq, each=N.y), rep(yseq, N.x), i)
+		results <- rep(0, N.x*N.y)
+		lapply(x$closed.polys[poly.i], function(poly) {
+			results <<- results+pointInPoly2D(pts.xyz[,1:2], poly[,1:2])
+		})
+		pts.xyz <- pts.xyz[which(results %%2 != 0),]
+		# CALCULATE (INTERPOLATE) DOSES FOR EACH POINT CONTAINED IN STRUCTURE
+		voxels <- approx3D(dose, pts.xyz)
+		dose.min <- min(dose.min, min(voxels, na.rm=TRUE), na.rm=TRUE)
+		dose.max <- max(dose.max, max(voxels, na.rm=TRUE), na.rm=TRUE)
+		dvh.matrix <- cbind(dvh.matrix, hist(voxels, breaks=c(doses, max(dose)),plot=FALSE,right=FALSE)$counts*prod(resolution.xyz)/1000)
+	}
+	colnames(dvh.matrix) <- z.unique
+	dvh.volume <- sum(dvh.matrix)
+	return(new("zDVH", type="differential", dose.type="absolute", volume.type="absolute", structure.volume=dvh.volume, doses=doses, volumes=dvh.matrix, dose.max=dose.max, dose.min=dose.min, dose.mean=sum(dvh.matrix*doses)/dvh.volume, dose.units=dose.units, structure.name=names(x)))
+}
+#line 1 "/Users/thompsre/RadOnc/R/compareStructures.R"
+compareStructures <- function(structures, method=NULL, hausdorff.method=NULL, verbose=TRUE, plot=TRUE, pixels=100) {
+	if (class(structures) != "structure.list") {
+		warning("Input 'structures' must be of class 'structure.list'")
+		return()
+	}
+	empty <- unlist(lapply(structures, function(struct) {return(dim(struct)[1] <= 0)}))
+	if (any(empty)) {
+		warning(paste("Skipping empty structure(s): ", paste(names(structures[empty]), collapse=", ", sep=""), sep=""))
+		structures <- structures[!empty]
+	}
+	N <- length(structures)
+	if (N < 2) {
+		warning("Need at least 2 structures to perform comparison")
+		return()
+	}
+	method <- match.arg(method, choices=c("axial", "surface", "hausdorff", "grid", "DSC", "EMD"))
+	hausdorff.method <- match.arg(hausdorff.method, choices=c("mean", "median", "absolute"))
+	switch(method,
+		axial = contours <- compareStructures.axial(structures, pixels=pixels),
+		grid = {
+			warning("method='grid' no longer supported, use method='axial' instead")
+			contours <- compareStructures.axial(structures, pixels=pixels)
+		},
+		surface = contours <- compareStructures.surface(structures),
+		hausdorff = return(compareStructures.hausdorff(structures, method=hausdorff.method, verbose=verbose)),
+		DSC = {
+			contours <- compareStructures.axial(structures, pixels=pixels)
+			N <- dim(contours)[2]-3
+			results <- matrix(0, nrow=N, ncol=N, dimnames=list(names(structures), names(structures)))
+			for (i in 1:N) {
+				for (j in 1:N) {
+					if (i == j) {
+						results[i, j] <- 1#
+						next
+					}
+					results[i, j] <- 2*sum((contours[,i+3]>0) & (contours[,j+3]>0))/(sum(contours[,i+3]>0)+sum(contours[,j+3]>0))
+				}
+			}
+			return(results)
+		},
+		EMD = return(compareStructures.EMD(structures))
+	)
+	if ((plot) & (method %in% c("axial", "grid"))) {
+		mar.old <- par()$mar
+		par(mar=c(0, 0, 0, 0))
+		z.unique <- sort(unique(contours[,3]))
+		N.z <- length(z.unique)
+		layout(matrix(c(1:N.z*2, 1:N.z*2-1), nrow=N.z, ncol=2), widths=c(1, 10), heights=1)
+		levels <- 0:N
+		for (z.i in z.unique) {
+			contours.i <- contours[which(contours[,3] == z.i), ]
+			sum.i <- apply(contours.i[, 1:N+3], 1, sum, na.rm=TRUE)
+			x <- unique(contours.i[, 1])
+			y <- unique(contours.i[, 2])
+			lvl.i <- matrix(sum.i, nrow=length(x), ncol=length(y))
+			plot(range(x), range(y), type="n", xaxt="n", yaxt="n")
+			graphics::.filled.contour(x, y, z=lvl.i, levels=levels, col=c(NA,rev(heat.colors(N-1))))
+ 			contour(x, y, z=lvl.i, levels=levels, col="black", add=TRUE, drawlabels=FALSE, lwd=0.25)
+			plot(1,type="n",xaxt="n",yaxt="n")
+			text(1, labels=paste("z=", z.i, sep=""))
+		}
+		par(mar=mar.old)
+	}
+	return(contours)
+}	
+
+compareStructures.surface <- function (structures) {	
+	N <- length(structures)
+	z <- as.list(rep(NA, N))
+	pts <- matrix(nrow=0, ncol=3, dimnames=list(NULL, c("X", "Y", "Z")))
+	for (i in 1:N) {
+		if (length(structures[[i]]$vertices) < 1) {
+			next
+		}
+		z[[i]] <- unlist(lapply(structures[[i]]$closed.polys, function(closed.poly) {return(unique(closed.poly[,3]))}))
+		pts <- rbind(pts, structures[[i]]$vertices)
+	}
+	results <- matrix(0, nrow=dim(pts)[1], ncol=N, dimnames=list(NULL, names(structures)))
+	for (i in 1:N) {
+#		plot3d(structures[[i]]$vertices,col="gray",cex=0.2)
+		for (j in unique(z[[i]])) {
+			pts.j <- pts[which(pts[, 3]== j), 1:2]
+			results.j <- rep(0, dim(pts.j)[1])
+			z.j <- which(z[[i]] == j)
+			## THIS LOOP ACCOUNTS FOR AXIAL SLICES WITH MULTIPLE SEPARATE CLOSED POLYGONS (e.g. 3 ROOTS FOR SINGLE TOOTH)
+			## THIS LOOP DOES NOT(!!!) ACCOUNT FOR DONUTS (E.G. STRUCTURES WITH HOLE IN THEM -- NEED TO FIGURE OUT HOW THOSE ARE STORED FIRST) -- IF STRUCTURE HAS A HOLE, ALL BETS ARE OFF AT THE MOMENT... SOLUTION WILL BE TO DO LOGICAL SUBTRACTION RATHER THAN ADDITION OF RESULTS
+			for (k in 1:length(z.j)) {
+				results.j <- results.j + as.numeric(pointInPoly2D(pts.j[,1:2], structures[[i]]$closed.polys[[z.j[k]]][,1:2]))
+			}
+			results[which(pts[, 3]== j), i] <- results[which(pts[, 3]== j), i]+results.j
+		}
+	}
+#	points3d(pts, col=rainbow(n=3)[apply(results,1,sum)])
+#	points3d(pts[which(apply(results,1,sum)==3),],col="black",cex=2)
+	return(cbind(pts, results))
+}
+
+compareStructures.axial <- function (structures, pixels=100) {	
+	N <- length(structures)
+	z <- as.list(rep(NA, N))
+	bounds <- range(structures, na.rm=TRUE)
+	x.coords <- seq(from=bounds[1,1], to=bounds[2,1], length.out=pixels)
+	y.coords <- seq(from=bounds[1,2], to=bounds[2,2], length.out=pixels)
+	for (i in 1:N) {
+		if (length(structures[[i]]$vertices) < 1) {
+			next
+		}
+		z[[i]] <- unlist(lapply(structures[[i]]$closed.polys, function(closed.poly) {return(unique(closed.poly[,3]))}))
+	}
+	z.coords <- unique(unlist(z))
+	pts <- matrix(nrow=length(x.coords)*length(y.coords)*length(z.coords), ncol=3, dimnames=list(NULL, c("X", "Y", "Z")))
+	pts <- matrix(c(rep(x.coords, each=length(y.coords)*length(z.coords)), rep(rep(y.coords, each=length(z.coords)), length(x.coords)), rep(z.coords, length(x.coords)*length(y.coords))), nrow=length(x.coords)*length(y.coords)*length(z.coords), ncol=3, dimnames=list(NULL, c("X", "Y", "Z"))) 
+	results <- matrix(0, nrow=dim(pts)[1], ncol=N, dimnames=list(NULL, names(structures)))
+	for (i in 1:N) {
+		for (j in unique(z[[i]])) {
+			pts.j <- pts[which(pts[, 3]== j), 1:2]
+			results.j <- rep(0, dim(pts.j)[1])
+			z.j <- which(z[[i]] == j)
+			## THIS LOOP ACCOUNTS FOR AXIAL SLICES WITH MULTIPLE SEPARATE CLOSED POLYGONS (e.g. 3 ROOTS FOR SINGLE TOOTH)
+			## IF CLOSED POLYGONS ARE NESTED, THEY WILL BE INTERPRETED AS HOLES, SUCH THAT POINTS BETWEEN TWO POLYGONS MAY BE INTERPRETED AS EXTERIOR TO THE POLYGONS THEMSELVES (NOTE THAT THIS ASSUMES THE POLYGONS DO NOT CROSS EACH OTHER AT ANY POINT)
+			for (k in 1:length(z.j)) {
+				results.j <- results.j + as.numeric(pointInPoly2D(pts.j[,1:2], structures[[i]]$closed.polys[[z.j[k]]][,1:2]))
+			}
+			results[which(pts[, 3]== j), i] <- results[which(pts[, 3]== j), i]+(results.j %% 2 != 0)	
+		}
+	}
+	return(cbind(pts, results))
+}
+
+
+compareStructures.hausdorff <- function (structures, verbose=TRUE, method=NULL) {
+
+	hausdorff.dist <- function (A, B, method) {
+		if (ncol(A) != ncol(B)){
+			warning("Dimensionality of A and B must be the same")
+			return(NA)
+		}
+		compute.dist = function (a0, B0){
+			C0 <- matrix(rep(a0, each=nrow(B0)),byrow=F, ncol=ncol(B0))
+			return(min(apply(C0-B0, 1, function(x) {sqrt(sum(t(x)*x))}), na.rm=TRUE))
+		}
+	
+		if (method == "mean") {
+			d1 <- apply(A, 1, compute.dist, B0=B)
+			d2 <- apply(B, 1, compute.dist, B0=A)
+			return(mean(c(d1, d2), na.rm=TRUE))
+		}
+		else if (method == "median") {
+			d1 <- apply(A, 1, compute.dist, B0=B)
+			d2 <- apply(B, 1, compute.dist, B0=A)
+			return(median(c(d1, d2), na.rm=TRUE))
+		}
+		else if (method == "absolute") {
+			d1 <- max(apply(A, 1, compute.dist, B0=B))
+			d2 <- max(apply(B, 1, compute.dist, B0=A))
+			return(max(d1, d2, na.rm=TRUE))
+		}
+		else {
+			warning("Invalid 'method' argument; must be one of 'mean', 'median', or 'absolute'")
+			return(NA)
+		}
+	}
+
+	method <- match.arg(method, choices=c("mean", "median", "absolute"))
+	N <- length(structures)
+	results <- matrix(0, nrow=N, ncol=N, dimnames=list(names(structures), names(structures)))
+	for (i in 1:N) {
+		if (verbose) {
+			cat("Analyzing structure ", i, "/", N, " (", structures[[i]]$name, ") ... ", sep="")
+		}
+		for (j in i:N) {
+			results[i, j] <- hausdorff.dist(structures[[i]]$vertices, structures[[j]]$vertices, method=method)
+			results[j, i] <- results[i, j]
+		}
+		if (verbose) {
+			cat("FINISHED\n")
+		}
+	}
+	return(results)
+}
+
+compareStructures.EMD <- function (structures) {	
+	cat("EMD method currently unavailable (in development) -- will be available in a future release\n")
+	return()
+}
+
+pointInPoly2D <- function (points, poly) {
+	poly <- matrix(unique(poly), ncol=2)
+	n <- dim(poly)[1]
+    x <- diff(poly[c(1:n,1),1])
+	y <- poly[,2] + poly[c(2:n,1),2]
+	if (sum(x*y/2) >= 0) {
+		#clockwise poly
+		return(pip2d(poly[n:1,], points) >= 0)
+	}
+	else {
+		#anti-clockwise poly
+		return(pip2d(poly, points) >= 0)
+	}
+}
+#line 1 "/Users/thompsre/RadOnc/R/convert.DVH.R"
+convert.DVH <- function(..., type=NULL, dose=NULL, volume=NULL, dose.units=NULL) {
+	type <- match.arg(type, choices=c(NA, "cumulative", "differential"))
+	dose <- match.arg(dose, choices=c(NA, "absolute", "relative"))
+	volume <- match.arg(volume, choices=c(NA, "relative", "absolute"))
+	dose.units <- match.arg(dose.units, choices=c(NA, "cGy", "Gy"))
+	arglist <- c(...)
+	arglist <- arglist[unlist(lapply(arglist, function(arg) { ((class(arg)[1] %in% c("DVH", "zDVH")) & validObject(arg)) }))]
+	N <- length(arglist)
+	if (N <=0) {
+		return(NULL)
+	}
+	
+	for (i in 1:N) {
+		x <- arglist[[i]]
+		if (is.empty(x)) { 
+			x@dose.type <- dose
+			x@volume.type <- volume
+			x@type <- type
+			x@dose.units <- dose.units
+			arglist[[i]] <- x
+			next	
+		}
+		if ((!is.na(dose)) & (dose != x@dose.type)) {
+			if (is.na(x@dose.rx)) {
+				warning(paste("Cannot convert DVH (", x@structure.name, ") doses because prescription dose is not specified", sep=""), immediate.=TRUE, call.=FALSE)
+				arglist[[i]] <- x
+				next	
+			}
+			if (dose == "absolute") {
+				x@doses <- x@doses * x@dose.rx / x@rx.isodose
+				x@dose.max <- x@dose.max * x@dose.rx / x@rx.isodose
+				x@dose.min <- x@dose.min * x@dose.rx / x@rx.isodose
+				x@dose.mean <- x@dose.mean * x@dose.rx / x@rx.isodose
+				x@dose.median <- x@dose.median * x@dose.rx / x@rx.isodose
+				x@dose.mode <- x@dose.mode * x@dose.rx / x@rx.isodose
+				x@dose.STD <- x@dose.STD * x@dose.rx / x@rx.isodose
+				x@dose.type <- "absolute"
+			}
+			else {
+				x@doses <- x@doses * x@rx.isodose / x@dose.rx
+				x@dose.max <- x@dose.max * x@rx.isodose / x@dose.rx
+				x@dose.min <- x@dose.min * x@rx.isodose / x@dose.rx
+				x@dose.mean <- x@dose.mean * x@rx.isodose / x@dose.rx
+				x@dose.median <- x@dose.median * x@rx.isodose / x@dose.rx
+				x@dose.mode <- x@dose.mode * x@rx.isodose / x@dose.rx
+				x@dose.STD <- x@dose.STD * x@rx.isodose / x@dose.rx
+				x@dose.type <- "relative"
+			}
+		}
+		else {
+			dose <- x@dose.type
+		}
+		if ((!is.na(volume)) & (volume != x@volume.type)) {
+			if (volume == "absolute") {
+				if (x@structure.volume == 0) {
+					print(x@structure.volume)
+					warning(paste("Cannot convert DVH (", x@structure.name, ") to 'absolute' volume units, because structure has zero volume", sep=""), immediate.=TRUE, call.=FALSE)
+				}
+				x@volumes <- x@volumes * x@structure.volume / 100
+				x@volume.type <- "absolute"
+			}
+			else {
+				x@volumes <- 100 * x@volumes / x@structure.volume
+				x@volume.type <- "relative"
+			}
+		}
+		else {
+			volume <- x@volume.type
+		}
+		if ((!is.na(dose.units)) & (dose.units != x@dose.units)) {
+			if (dose.units == "cGy") {
+				x@dose.rx <- x@dose.rx * 100
+				if (x@dose.type == "absolute") {
+					x@doses <- x@doses * 100
+					x@dose.max <- x@dose.max * 100
+					x@dose.min <- x@dose.min * 100
+					x@dose.mean <- x@dose.mean * 100
+					x@dose.median <- x@dose.median * 100
+					x@dose.mode <- x@dose.mode * 100
+					x@dose.STD <- x@dose.STD * 100
+				}
+			}
+			else {
+				x@dose.rx <- x@dose.rx / 100
+				if (x@dose.type == "absolute") {
+					x@doses <- x@doses / 100
+					x@dose.max <- x@dose.max / 100
+					x@dose.min <- x@dose.min / 100
+					x@dose.mean <- x@dose.mean / 100
+					x@dose.median <- x@dose.median / 100
+					x@dose.mode <- x@dose.mode / 100
+					x@dose.STD <- x@dose.STD / 100
+				}
+			}
+			x@dose.units <- dose.units
+		}
+		if ((!is.na(type)) & (type != x@type)) {
+			if (type == "cumulative") {
+				temp.doses <- x@doses - diff(c(-x@doses[1], x@doses))/2
+				x@doses <- c(temp.doses, (2*x@doses - temp.doses)[length(temp.doses)])
+				if (volume == "relative") {
+					if (class(x) == "DVH") {
+						x@volumes <- diffinv(-x@volumes, xi=100)
+					}
+					else {
+						volumes <- diffinv(-x@volumes, xi=matrix(apply(x@volumes, 2, sum), nrow=1))
+						class(volumes) <- c("numeric", "matrix")
+						colnames(volumes) <- colnames(x@volumes)
+						x@volumes <- volumes
+					}
+				}
+				else {
+					if (class(x) == "DVH") {
+						x@volumes <- diffinv(-x@volumes, xi=x@structure.volume)
+					}
+					else {
+						volumes <- diffinv(-x@volumes, xi=matrix(apply(x@volumes, 2, sum), nrow=1))
+						class(volumes) <- c("numeric", "matrix")
+						colnames(volumes) <- colnames(x@volumes)
+						x@volumes <- volumes
+					}
+				}
+				x@type <- "cumulative"
+			}
+			else {
+				if (class(x) == "DVH") {
+					x@volumes <- -diff(x@volumes)
+				}
+				else {
+					volumes <- -apply(x@volumes, 2, diff)
+					class(volumes) <- c("numeric", "matrix")
+					colnames(volumes) <- colnames(x@volumes)
+					x@volumes <- volumes
+				}
+				x@doses <- x@doses[1:(length(x@doses)-1)] + diff(x@doses)/2
+				x@type <- "differential"
+			}
+		}
+		arglist[[i]] <- x
+	}
+	if (N == 1) { return(arglist[[1]]) }
+	return(arglist)
+}
+#line 1 "/Users/thompsre/RadOnc/R/gEUD.R"
+setGeneric("gEUD",
+	function (x, a, ...) {
+		standardGeneric("gEUD") 
+	}
+)
+
+setMethod("gEUD", c("ANY", "missing"),
+	function (x, a, ...) {
+		stop("argument 'a' is missing, with no default")
+	}
+)
+
+setMethod("gEUD", c("DVH", "numeric"),
+	function (x, a, dose.units=c("cGy", "Gy")) {
+		dose.units <- match.arg(dose.units)
+		if (length(a) < 1) {
+			warning("argument 'a' is of zero length")
+			return(NA)
+		}
+		else if (length(a) > 1) {
+			warning(paste("length of 'a' exceeds length of 'x', will use single value for a=",a[1], sep=""))
+			a <- a[1]
+		}
+		if (a == 0) {
+			warning("argument 'a' must be non-zero")
+			return(NA)
+		}
+		if (is.empty(x)) {
+			warning("argument 'x' is an empty DVH")
+			return(NA)
+		}
+		x <- convert.DVH(x, type="differential", dose="absolute", volume="absolute", dose.units=dose.units)
+		if (a == 1) {
+			return(x$dose.mean)
+		}
+		else if (a == Inf) {
+			return(x$dose.max)
+		}
+		else if (a == -Inf) {
+			return(x$dose.min)
+		}
+		res <- sum((x$volumes * (x$doses ** a) / x$structure.volume)[x$volumes > 0], na.rm=TRUE)
+		if ((res == Inf) & (a > 0)) {
+			warning("Calculation exceeded machine's numerical precision")
+			return(x$dose.max)
+		}
+		else if ((res == 0) & (a < 0)) {
+			warning("Calculation exceeded machine's numerical precision")
+			return(x$dose.min)
+		}
+		return(res ** (1/a)) 
+	}
+)
+
+setMethod("gEUD", c("DVH.list", "numeric"),
+	function (x, a, dose.units=c("cGy", "Gy")) {
+		dose.units <- match.arg(dose.units)
+		if (length(a) < 1) {
+			warning("argument 'a' is of zero length")
+			return(rep(NA, length(x)))
+		}
+		x <- new("DVH.list", lapply(x, convert.DVH, type="differential", dose="absolute", volume="absolute", dose.units=dose.units))
+		if (length(a) != length(x)) {
+			if (length(a) > 1) {
+				warning(paste("length of 'x' and 'a' do not match, will use single value for a=",a[1], sep=""))
+			}
+			a <- rep(a[1], length(x))
+		}
+		return(unlist(mapply(
+			function (dvh, a) {
+				if (a == 1) {
+					return(dvh$dose.mean)
+				}
+				if (a == Inf) {
+					return(dvh$dose.max)
+				}
+				if (a == -Inf) {
+					return(dvh$dose.min)
+				}
+				if (a == 0) {
+					return(NA)
+				}
+				if (is.empty(dvh)) {
+					return(NA)
+				}
+				res <- sum((dvh$volumes * (dvh$doses ** a) / dvh$structure.volume)[dvh$volumes > 0], na.rm=TRUE)
+				if ((res == Inf) & (a > 0)) {
+					warning("Calculation exceeded machine's numerical precision")
+					return(dvh$dose.max)
+				}
+				else if ((res == 0) & (a < 0)) {
+					warning("Calculation exceeded machine's numerical precision")
+					return(dvh$dose.min)
+				}
+				return(res ** (1/a)) 
+			}, x, a))
+		)
+	}
+)
+#line 1 "/Users/thompsre/RadOnc/R/get.HU.R"
+setGeneric("get.HU",
+	function (x, CT, ...) {
+		standardGeneric("get.HU")
+	}
+)
+
+setMethod("get.HU", c("RTdata", "missing"),
+	function (x, CT, resolution.xyz=NA, resolution.HU=1, method=NULL) {
+		return(get.HU(x$structures, x$CT, resolution.xyz, resolution.HU, method))	
+	}
+)
+
+setMethod("get.HU", c("structure3D", "array"),
+	function (x, CT, resolution.xyz=NA, resolution.HU=1, method=NULL) {
+		if (any(!is.na(resolution.xyz)) & length(resolution.xyz) != 3) {
+			warning("Argument 'resolution.xyz' must be of length 3")
+			return()
+		}
+		method <- match.arg(method, choices=c("axial"))
+		switch(method,
+			axial = return(calc.HU.axial(x, CT, resolution.xyz, resolution.HU))
+		)
+	}
+)
+
+setMethod("get.HU", c("structure.list", "array"),
+	function(x, CT, resolution.xyz=NA, resolution.HU=1, method=NULL) {
+		if (any(!is.na(resolution.xyz)) & length(resolution.xyz) != 3) {
+			warning("Argument 'resolution.xyz' must be of length 3")
+			return()
+		}
+		method <- match.arg(method, choices=c("axial"))	
+		switch(method,
+			axial = {
+				return(as(lapply(x, function(structure) {
+					return(calc.HU.axial(structure, CT, resolution.xyz, resolution.HU))
+				}), "list"))
+			},
+			{
+				warning("Inappropriate method selection (", method, ")")
+				return()
+			}
+		)
+	}
+)
+
+setMethod("get.HU", c("ANY", "missing"),
+	function (x, CT, ...) {
+		warning("Argument 'CT' is missing with no default")
+		return()
+	}
+)
+
+setMethod("get.HU", c("ANY", "array"),
+	function (x, CT, ...) {
+		warning("Argument 'x' is not an object of class structure3D, structure.list, or RTdata")
+		return()
+	}
+)
+
+setMethod("get.HU", c("ANY", "ANY"),
+	function (x, CT, ...) {
+		warning("Improper input(s) 'x' and/or 'CT', please refer to RadOnc package documentation for further information")
+		return()
+	}
+)
+
+
+calc.HU.axial <- function(x, CT, resolution.xyz=NA, resolution.HU=1) {
+	if (length(x$closed.polys) < 1) {
+		warning("Structure '", names(x), "' is empty (it contains no pre-defined axial slices)")	
+		return()	
+	}
+	if (any(!is.na(resolution.xyz)) & length(resolution.xyz) != 3) {
+		warning("Argument 'resolution.xyz' must be of length 3")
+		return()
+	}
+	CT.xrange <- range(as.numeric(dimnames(CT)[[1]]), na.rm=TRUE)
+	CT.yrange <- range(as.numeric(dimnames(CT)[[2]]), na.rm=TRUE)
+	CT.zrange <- range(as.numeric(dimnames(CT)[[3]]), na.rm=TRUE)
+	range.struct <- range(x)
+	if ((range.struct[1,1] < CT.xrange[1]) | (range.struct[2,1] > CT.xrange[2]) | 
+		(range.struct[1,2] < CT.yrange[1]) | (range.struct[2,2] > CT.yrange[2]) |
+		(range.struct[1,3] < CT.zrange[1]) | (range.struct[2,3] > CT.zrange[2])) {
+			warning("Structure '", names(x), "' extends beyond CT coordinates")
+			return()
+	}
+	if (is.na(resolution.xyz[1])) {
+		xseq <- as.numeric(dimnames(CT)[[1]])
+	}
+	else {
+		offset.x <- ((range.struct[2,1]-range.struct[1,1]) %% resolution.xyz[1]) / 2
+		xseq <- seq(from=range.struct[1,1]+offset.x, to=range.struct[2,1]-offset.x, by=resolution.xyz[1])
+	}
+	N.x <- length(xseq)
+	if (is.na(resolution.xyz[2])) {
+		yseq <- as.numeric(dimnames(CT)[[2]])
+	}
+	else {
+		offset.y <- ((range.struct[2,2]-range.struct[1,2]) %% resolution.xyz[2]) / 2
+		yseq <- seq(from=range.struct[1,2]+offset.y, to=range.struct[2,2]-offset.y, by=resolution.xyz[2])
+	}
+	N.y <- length(yseq)
+	z.unique <- sort(unique(x$vertices[,3]))
+	if (is.na(resolution.xyz[3])) {
+		resolution.xyz[3] <- median(abs(diff(z.unique)))
+	}
+	poly.z <- unlist(lapply(x$closed.polys, function(poly) {return(poly[1,3])}))
+	N.z <- length(z.unique)
+	HUs <- seq(from=min(CT), to=max(CT), by=resolution.HU)
+	voxels <- c()
+	for (i in z.unique) {
+		poly.i <- which(poly.z == i)
+		# TEST WHETHER EACH POINT IN GRID IS CONTAINED WITHIN POLYGON(S)
+		pts.xyz <- cbind(rep(xseq, each=N.y), rep(yseq, N.x), i)
+		results <- rep(0, N.x*N.y)
+		lapply(x$closed.polys[poly.i], function(poly) {
+			results <<- results+pointInPoly2D(pts.xyz[,1:2], poly[,1:2])
+		})
+		pts.xyz <- pts.xyz[which(results %%2 != 0),]
+		# CALCULATE (INTERPOLATE) DOSES FOR EACH POINT CONTAINED IN STRUCTURE
+		voxels <- c(voxels, approx3D(CT, pts.xyz))
+	}
+	return(hist(voxels, breaks=HUs, plot=FALSE, right=FALSE))
+#	HU <- hist(voxels, breaks=HUs,plot=FALSE,right=FALSE)$counts*prod(resolution.xyz)/1000
+#	print(sum(HU))
+#	return(HU)
+}
+#line 1 "/Users/thompsre/RadOnc/R/mean.DVH.R"
+setGeneric("mean",
+	mean
+)
+
+setMethod("mean", "DVH.list",
+	function (x, ..., type=c("cumulative", "differential"), dose=c("absolute", "relative"), dose.units=c("cGy", "Gy"), volume=c("relative", "absolute"), weighted=FALSE) {
+		type <- match.arg(type)
+		dose <- match.arg(dose)
+		dose.units <- match.arg(dose.units)
+		volume <- match.arg(volume)
+		x <- x[!unlist(lapply(x, is.empty))]
+		N <- length(x)
+		if (N < 1) {
+			return(x)
+		}
+		x <- new("DVH.list", lapply(x, convert.DVH, type=type, dose=dose, dose.units=dose.units, volume=volume))
+		structure.name <- paste("mean(", paste(names(x), collapse=", ", sep=""), ")", sep="")
+		structure.volumes <- as.numeric(lapply(x, slot, "structure.volume"))
+		structure.means <- as.numeric(lapply(x, slot, "dose.mean"))
+		if (weighted) {
+			dose.mean <- sum(structure.means * structure.volumes, na.rm=TRUE)/sum(structure.volumes, na.rm=TRUE)
+		}
+		else {
+			dose.mean <- mean(structure.means, na.rm=TRUE)
+		}
+		size <- ceiling(mean(as.numeric(lapply(x, function(DVH) { length(DVH@doses) })), na.rm=TRUE))
+		dose.min <- min(x)
+		dose.max <- max(x)
+		doses.new <- diffinv(rep((ceiling(dose.max)-0)/(size-1), size-1), xi=0)
+		dose.rx <- max(100 * unlist(lapply(x,slot,"dose.rx")) / unlist(lapply(x,slot,"rx.isodose")), na.rm=TRUE)
+		rx.isodose <- 100
+		volume.matrix <- matrix(NA, ncol=N, nrow=size)
+		for (i in 1:N) {
+			if (class(x[[i]]) == "zDVH") {
+				x[[i]] <- as(x[[i]], "DVH")	
+			}
+			volume.matrix[,i] <- approx(x[[i]]$doses, x[[i]]$volumes, doses.new, rule=2)$y
+		}
+		if (weighted) {
+			volumes.new <- apply(t(t(volume.matrix)*structure.volumes), 1, sum, na.rm=TRUE)/sum(structure.volumes)
+		}
+		else {
+			volumes.new <- apply(volume.matrix, 1, mean, na.rm=TRUE)
+		}
+		new("DVH", type=type, dose.type=dose, volume.type=volume, structure.name=structure.name, structure.volume=mean(structure.volumes), dose.min=dose.min, dose.rx=dose.rx, rx.isodose=rx.isodose, dose.max=dose.max, dose.mean=dose.mean, doses=doses.new, dose.units=dose.units, volumes=volumes.new)
+	}
+)
+
+
+setMethod("mean", "DVH",
+	function (x, na.rm=TRUE) {
+		if (is.na(x@dose.mean)) {
+			if (x@type == "cumulative") {
+				x <- convert.DVH(x, type="differential", dose=x@dose.type, volume="absolute", dose.units=x@dose.units)
+			}
+			return(sum(x@doses*x@volumes, na.rm=na.rm)/sum(x@volumes, na.rm=na.rm))
+		}
+		else {
+			return(x@dose.mean)
+		}
+	}
+)
+
+
+setGeneric("median",
+	median
+)
+
+setMethod("median", "DVH.list",
+	function (x, na.rm=TRUE) {
+		x <- x[!unlist(lapply(x, is.empty))]
+		N <- length(x)
+		if (N < 1) {
+			return(x)
+		}
+		identical.format <- TRUE
+		type.format <- unique(unlist(lapply(x, slot, "type")))
+		if (length(type.format) > 1) {
+			warning("DVH 'type' parameter differs among DVH data (will reinterpet all data as cumulative DVH)")
+			type.format <- "cumulative"
+			identical.format <- FALSE
+		}
+		dose.format <- unique(unlist(lapply(x, slot, "dose.type")))
+		if (length(dose.format) > 1) {
+			warning("'dose.type' parameter differs among DVH data (will reinterpret all data relative dose)")
+			dose.format <- "relative"
+			identical.format <- FALSE
+		}
+		volume.format <- unique(unlist(lapply(x, slot, "volume.type")))
+		if (length(volume.format) > 1) {
+			warning("'volume.type' parameter differs among DVH data (will reinterpret all data as relative volume)")
+			volume.format <- "relative"
+			identical.format <- FALSE
+		}
+		units.format <- unique(unlist(lapply(x, slot, "dose.units")))
+		if (length(units.format) > 1) {
+			warning("'dose.units' parameter differs among DVH data (will reinterpret all doses as cGy)")
+			units.format <- "cGy"
+			identical.format <- FALSE
+		}
+		if (!identical.format) {
+			x <- convert.DVH(x, type=type.format, dose=dose.format, volume=volume.format, dose.units=units.format)
+		}
+		structure.name <- paste("median(", paste(names(x), collapse=", ", sep=""), ")", sep="")
+		structure.volume <- median(as.numeric(lapply(x, slot, "structure.volume")), na.rm=na.rm)
+		structure.means <- as.numeric(lapply(x, slot, "dose.mean"))
+		dose.mean <- median(structure.means, na.rm=na.rm)
+		dose.units <- slot(x[[1]], "dose.units")
+		size <- ceiling(mean(as.numeric(lapply(x, function(DVH) { length(DVH@doses) })), na.rm=TRUE))
+		dose.min <- min(x)
+		dose.max <- max(x)
+		dose.rx <- max(100 * unlist(lapply(x,slot,"dose.rx")) / unlist(lapply(x,slot,"rx.isodose")), na.rm=TRUE)
+		rx.isodose <- 100
+		doses.new <- diffinv(rep((ceiling(dose.max)-0)/(size-1), size-1), xi=0)
+		volume.matrix <- matrix(NA, ncol=N, nrow=size)
+		for (i in 1:N) {
+			if (class(x[[i]]) == "zDVH") {
+				x[[i]] <- as(x[[i]], "DVH")	
+			}
+			volume.matrix[,i] <- approx(x[[i]]$doses, x[[i]]$volumes, doses.new, rule=2)$y
+		}
+		volumes.new <- apply(volume.matrix, 1, median, na.rm=na.rm)
+		new("DVH", type=x[[1]]$type, dose.type=x[[1]]$dose.type, volume.type=x[[1]]$volume.type, structure.name=structure.name, structure.volume=structure.volume, dose.rx=dose.rx, rx.isodose=rx.isodose, dose.min=dose.min, dose.max=dose.max, dose.mean=dose.mean, doses=doses.new, dose.units=dose.units, volumes=volumes.new)
+	}
+)
+
+
+setGeneric("mad", 
+	mad
+)
+
+setMethod("mad", "DVH.list",
+	function (x) {
+		x <- x[!unlist(lapply(x, is.empty))]
+		N <- length(x)
+		if (N < 1) {
+			return()
+		}
+		identical.format <- TRUE
+		type.format <- unique(unlist(lapply(x, slot, "type")))
+		if (length(type.format) > 1) {
+			warning("DVH 'type' parameter differs among DVH data (will reinterpet all data as cumulative DVH)")
+			type.format <- "cumulative"
+			identical.format <- FALSE
+		}
+		dose.format <- unique(unlist(lapply(x, slot, "dose.type")))
+		if (length(dose.format) > 1) {
+			warning("'dose.type' parameter differs among DVH data (will reinterpret all data relative dose)")
+			dose.format <- "relative"
+			identical.format <- FALSE
+		}
+		volume.format <- unique(unlist(lapply(x, slot, "volume.type")))
+		if (length(volume.format) > 1) {
+			warning("'volume.type' parameter differs among DVH data (will reinterpret all data as relative volume)")
+			volume.format <- "relative"
+			identical.format <- FALSE
+		}
+		units.format <- unique(unlist(lapply(x, slot, "dose.units")))
+		if (length(units.format) > 1) {
+			warning("'dose.units' parameter differs among DVH data (will reinterpret all doses as cGy)")
+			units.format <- "cGy"
+			identical.format <- FALSE
+		}
+		if (!identical.format) {
+			x <- convert.DVH(x, type=type.format, dose=dose.format, volume=volume.format, dose.units=units.format)
+		}
+		size <- ceiling(mean(as.numeric(lapply(x, function(DVH) { length(DVH@doses) })), na.rm=TRUE))
+		dose.min <- min(x)
+		dose.max <- max(x)
+		doses.new <- diffinv(rep((ceiling(dose.max)-0)/(size-1), size-1), xi=0)
+		if (N == 1) {
+			return(list(dose=doses.new, mad=rep(0, length(doses.new))))
+		}
+		volume.matrix <- matrix(NA, ncol=N, nrow=size)
+		for (i in 1:N) {
+			if (class(x[[i]]) == "zDVH") {
+				x[[i]] <- as(x[[i]], "DVH")	
+			}
+			volume.matrix[,i] <- approx(x[[i]]$doses, x[[i]]$volumes, doses.new, rule=2)$y
+		}
+		return(list(dose=doses.new, mad=apply(volume.matrix, 1, mad)))
+	}
+)
+
+
+setGeneric("quantile", 
+	quantile
+)
+
+setMethod("quantile", "DVH.list",
+	function (x, type=7, ...) {
+		x <- x[!unlist(lapply(x, is.empty))]
+		N <- length(x)
+		if (N < 1) {
+			return()
+		}
+		identical.format <- TRUE
+		type.format <- unique(unlist(lapply(x, slot, "type")))
+		if (length(type.format) > 1) {
+			warning("DVH 'type' parameter differs among DVH data (will reinterpet all data as cumulative DVH)")
+			type.format <- "cumulative"
+			identical.format <- FALSE
+		}
+		dose.format <- unique(unlist(lapply(x, slot, "dose.type")))
+		if (length(dose.format) > 1) {
+			warning("'dose.type' parameter differs among DVH data (will reinterpret all data relative dose)")
+			dose.format <- "relative"
+			identical.format <- FALSE
+		}
+		volume.format <- unique(unlist(lapply(x, slot, "volume.type")))
+		if (length(volume.format) > 1) {
+			warning("'volume.type' parameter differs among DVH data (will reinterpret all data as relative volume)")
+			volume.format <- "relative"
+			identical.format <- FALSE
+		}
+		units.format <- unique(unlist(lapply(x, slot, "dose.units")))
+		if (length(units.format) > 1) {
+			warning("'dose.units' parameter differs among DVH data (will reinterpret all doses as cGy)")
+			units.format <- "cGy"
+			identical.format <- FALSE
+		}
+		if (!identical.format) {
+			x <- convert.DVH(x, type=type.format, dose=dose.format, volume=volume.format, dose.units=units.format)
+		}
+		size <- ceiling(mean(as.numeric(lapply(x, function(DVH) { length(DVH@doses) })), na.rm=TRUE))
+		dose.min <- min(x)
+		dose.max <- max(x)
+		doses.new <- diffinv(rep((ceiling(dose.max)-0)/(size-1), size-1), xi=0)
+		volume.matrix <- matrix(NA, ncol=N, nrow=size)
+		for (i in 1:N) {
+			if (class(x[[i]]) == "zDVH") {
+				x[[i]] <- as(x[[i]], "DVH")	
+			}
+			volume.matrix[,i] <- approx(x[[i]]$doses, x[[i]]$volumes, doses.new, rule=2)$y
+		}
+		return(list(dose=doses.new, quantiles=apply(volume.matrix, 1, quantile, type=type, ...)))
+	}
+)
+
+setGeneric("var", 
+	var
+)
+
+setMethod("var", "DVH.list",
+	function (x, na.rm=TRUE) {
+		x <- x[!unlist(lapply(x, is.empty))]
+		N <- length(x)
+		if (N < 1) {
+			return()
+		}
+		identical.format <- TRUE
+		type.format <- unique(unlist(lapply(x, slot, "type")))
+		if (length(type.format) > 1) {
+			warning("DVH 'type' parameter differs among DVH data (will reinterpet all data as cumulative DVH)")
+			type.format <- "cumulative"
+			identical.format <- FALSE
+		}
+		dose.format <- unique(unlist(lapply(x, slot, "dose.type")))
+		if (length(dose.format) > 1) {
+			warning("'dose.type' parameter differs among DVH data (will reinterpret all data relative dose)")
+			dose.format <- "relative"
+			identical.format <- FALSE
+		}
+		volume.format <- unique(unlist(lapply(x, slot, "volume.type")))
+		if (length(volume.format) > 1) {
+			warning("'volume.type' parameter differs among DVH data (will reinterpret all data as relative volume)")
+			volume.format <- "relative"
+			identical.format <- FALSE
+		}
+		units.format <- unique(unlist(lapply(x, slot, "dose.units")))
+		if (length(units.format) > 1) {
+			warning("'dose.units' parameter differs among DVH data (will reinterpret all doses as cGy)")
+			units.format <- "cGy"
+			identical.format <- FALSE
+		}
+		if (!identical.format) {
+			x <- convert.DVH(x, type=type.format, dose=dose.format, volume=volume.format, dose.units=units.format)
+		}
+		size <- ceiling(mean(as.numeric(lapply(x, function(DVH) { length(DVH@doses) })), na.rm=TRUE))
+		dose.min <- min(x)
+		dose.max <- max(x)
+		doses.new <- diffinv(rep((ceiling(dose.max)-0)/(size-1), size-1), xi=0)
+		if (N == 1) {
+			return(list(dose=doses.new, var=rep(0, length(doses.new))))
+		}
+		volume.matrix <- matrix(NA, ncol=N, nrow=size)
+		for (i in 1:N) {
+			if (class(x[[i]]) == "zDVH") {
+				x[[i]] <- as(x[[i]], "DVH")	
+			}
+			volume.matrix[,i] <- pmax(0, approx(x[[i]]$doses, x[[i]]$volumes, doses.new, rule=2)$y, na.rm=TRUE)
+		}
+		return(list(dose=doses.new, var=apply(volume.matrix, 1, var, na.rm=na.rm)))
+	}
+)
+
+setGeneric("sd", 
+	sd
+)
+
+setMethod("sd", "DVH.list",
+	function (x, na.rm=TRUE) {
+		x <- x[!unlist(lapply(x, is.empty))]
+		N <- length(x)
+		if (N < 1) {
+			return()
+		}
+		identical.format <- TRUE
+		type.format <- unique(unlist(lapply(x, slot, "type")))
+		if (length(type.format) > 1) {
+			warning("DVH 'type' parameter differs among DVH data (will reinterpet all data as cumulative DVH)")
+			type.format <- "cumulative"
+			identical.format <- FALSE
+		}
+		dose.format <- unique(unlist(lapply(x, slot, "dose.type")))
+		if (length(dose.format) > 1) {
+			warning("'dose.type' parameter differs among DVH data (will reinterpret all data relative dose)")
+			dose.format <- "relative"
+			identical.format <- FALSE
+		}
+		volume.format <- unique(unlist(lapply(x, slot, "volume.type")))
+		if (length(volume.format) > 1) {
+			warning("'volume.type' parameter differs among DVH data (will reinterpret all data as relative volume)")
+			volume.format <- "relative"
+			identical.format <- FALSE
+		}
+		units.format <- unique(unlist(lapply(x, slot, "dose.units")))
+		if (length(units.format) > 1) {
+			warning("'dose.units' parameter differs among DVH data (will reinterpret all doses as cGy)")
+			units.format <- "cGy"
+			identical.format <- FALSE
+		}
+		if (!identical.format) {
+			x <- convert.DVH(x, type=type.format, dose=dose.format, volume=volume.format, dose.units=units.format)
+		}
+		size <- ceiling(mean(as.numeric(lapply(x, function(DVH) { length(DVH@doses) })), na.rm=TRUE))
+		dose.min <- min(x)
+		dose.max <- max(x)
+		doses.new <- diffinv(rep((ceiling(dose.max)-0)/(size-1), size-1), xi=0)
+		if (N == 1) {
+			return(list(dose=doses.new, sd=rep(0, length(doses.new))))
+		}
+		volume.matrix <- matrix(NA, ncol=N, nrow=size)
+		for (i in 1:N) {
+			if (class(x[[i]]) == "zDVH") {
+				x[[i]] <- as(x[[i]], "DVH")	
+			}
+			volume.matrix[,i] <- approx(x[[i]]$doses, x[[i]]$volumes, doses.new, rule=2)$y
+		}
+		return(list(dose=doses.new, sd=apply(volume.matrix, 1, sd, na.rm=na.rm)))
+	}
+)
+
+setMethod("max", "DVH.list",
+	function(x, ..., na.rm=TRUE) {
+		x <- c(x, ...)
+		return(max(as.numeric(lapply(x, max, na.rm=na.rm)), na.rm=na.rm))
+	}
+)
+
+
+setMethod("max", "DVH",
+	function (x, na.rm=TRUE) {
+		if (is.na(x@dose.max)) {
+			return(max(x@doses, na.rm=na.rm))
+		}
+		else {
+			return(x@dose.max)
+		}
+	}
+)
+
+setMethod("min", "DVH.list",
+	function(x, ..., na.rm=TRUE) {
+		x <- c(x, ...)
+		return(min(as.numeric(lapply(x, min, na.rm=na.rm)), na.rm=na.rm))
+	}
+)
+
+
+setMethod("min", "DVH",
+	function (x, na.rm=TRUE) {
+		if (is.na(x@dose.min)) {
+			return(min(x@doses, na.rm=na.rm))
+		}
+		else {
+			return(x@dose.min)
+		}
+	}
+)
+
+
+setMethod("range", "DVH.list",
+	function (x, ..., na.rm=TRUE) {
+		x <- c(x, ...)
+		return(range(unlist(lapply(x, range, na.rm=na.rm)), na.rm=na.rm))
+	}
+)
+
+
+setMethod("range", "DVH",
+	function (x, ..., na.rm=TRUE) {
+		if (is.na(x@dose.min) | is.na(x@dose.max)) {
+			return(range(x@doses, na.rm=na.rm))
+		}
+		else {
+			return(c(x@dose.min, x@dose.max))
+		}
+	}
+)
+
+
+setMethod("sum", "DVH.list",
+	function (x, ..., type=c("cumulative", "differential"), dose=c("absolute", "relative"), dose.units=c("cGy", "Gy"), volume=c("relative", "absolute"), na.rm = TRUE) {
+		x <- c(x, ...)
+		x <- x[!unlist(lapply(x, is.empty))]
+		N <- length(x)
+		if (N <= 1) {
+			return(x)
+		}
+		type <- match.arg(type)
+		dose <- match.arg(dose)
+		dose.units <- match.arg(dose.units)
+		volume <- match.arg(volume)
+		x <- new("DVH.list", lapply(x, convert.DVH, type="differential", dose="absolute", dose.units=dose.units, volume="absolute"))
+		structure.name <- paste("sum(", paste(names(x), collapse=", ", sep=""), ")", sep="")
+		structure.volumes <- as.numeric(lapply(x, slot, "structure.volume"))
+		volume.sum <- sum(structure.volumes, na.rm=TRUE)
+		dose.max <- max(x, na.rm=na.rm)
+		dose.min <- min(x, na.rm=na.rm)
+		dose.mean <- as.numeric(lapply(x, slot, "dose.mean"))
+		dose.mean <- sum(dose.mean * structure.volumes, na.rm=TRUE)/volume.sum
+		dose.rx <- max(100 * unlist(lapply(x,slot,"dose.rx")) / unlist(lapply(x,slot,"rx.isodose")), na.rm=TRUE)
+		rx.isodose <- 100
+		size <- ceiling(mean(as.numeric(lapply(x, function(DVH) { length(DVH@doses) })), na.rm=TRUE))
+		doses.new <- unique(unlist(lapply(x, slot, "doses")))
+		volume.matrix <- matrix(NA, ncol=N, nrow=size)
+		for (i in 1:N) {
+			if (class(x[[i]]) == "zDVH") {
+				x[[i]] <- as(x[[i]], "DVH")	
+			}
+			volume.matrix[,i] <- approx(x[[i]]$doses, x[[i]]$volumes, doses.new, rule=2)$y
+		}
+		volumes.new <- apply(volume.matrix, 1, sum, na.rm=na.rm)
+		x <- new("DVH", type="differential", dose.type="absolute", volume.type="absolute", structure.name=structure.name, structure.volume=volume.sum, dose.min=dose.min, dose.rx=dose.rx, rx.isodose=rx.isodose, dose.max=dose.max, dose.mean=dose.mean, doses=doses.new, dose.units=dose.units, volumes=volumes.new)
+		return(convert.DVH(x, type=type, dose=dose, dose.units=dose.units, volume=volume))
+	}
+)
+#line 1 "/Users/thompsre/RadOnc/R/plot.DVH.R"
+plot.DVH <- plot.DVH.list <- function(x, ..., plot.type=NULL) {
+	plot.type <- match.arg(plot.type, choices=c("individual", "grouped", "ttest", "wilcox", "bars", "correlation"))
+	switch(plot.type,
+		individual = {
+			plot.DVH.individual(x, ...)
+		},
+		grouped = {
+			plot.DVH.groups(x, ...)
+		},
+		ttest = {
+			plot.DVH.ttest(x, ...)
+		},
+		wilcox = {
+			plot.DVH.wilcox(x, ...)
+		},
+		bars = {
+			plot.DVH.bars(x, ...)
+		},
+		{
+			plot.DVH.corr(x, ...)
+		}
+	)
+}
+
+setGeneric("plot",
+	plot
+)
+
+setMethod("plot", c("DVH", "missing"),
+	function(x, ...) {
+		plot.DVH(new("DVH.list",list(x)), ...)
+	}
+)
+
+setMethod("plot", c("DVH", "DVH"),
+	function(x, y, ...) {
+		plot.DVH(new("DVH.list",list(x)), new("DVH.list",list(y)), ...)
+	}
+)
+
+setMethod("plot", c("zDVH", "DVH"),
+	function(x, y, ...) {
+		plot.DVH(new("DVH.list",list(x)), new("DVH.list",list(y)), ...)
+	}
+)
+
+setMethod("plot", c("DVH", "zDVH"),
+	function(x, y, ...) {
+		plot.DVH(new("DVH.list",list(x)), new("DVH.list",list(y)), ...)
+	}
+)
+
+setMethod("plot", c("zDVH", "zDVH"),
+	function(x, y, ...) {
+		plot.DVH(new("DVH.list",list(x)), new("DVH.list",list(y)), ...)
+	}
+)
+
+
+setMethod("plot", c("DVH", "ANY"),
+	function(x, y, ...) {
+		plot.DVH(new("DVH.list",list(x)), y, ...)
+	}
+)
+
+setMethod("plot", c("zDVH", "ANY"),
+	function(x, y, ...) {
+		plot.DVH(new("DVH.list",list(x)), y, ...)
+	}
+)
+
+setMethod("plot", c("DVH.list", "missing"),
+	function (x, y=NULL, ...) {
+		plot.DVH(x, ...)
+	}
+) 
+
+setMethod("plot", c("DVH.list", "ANY"),
+	function (x, y, ...) {
+		plot.DVH(x, y, ...)
+	}
+) 
+
+plot.DVH.ttest <- function(x, y, ..., alternative=NULL, mu=0, paired=FALSE, col="black", lty="solid", lwd=1, alpha=0.05, dose=c("absolute", "relative"), dose.units=c("cGy", "Gy"), volume=c("relative", "absolute"), type=c("cumulative", "differential"), width=NULL, main="", xlim=NULL, ylim=NULL, multiplier=1, quantile=c(0.25, 0.75), line.transparency=1, fill.transparency=line.transparency/2, angle=45, density=NULL, fill.lty=lty, fill=TRUE, legend=NULL, legend.labels=NULL, new=TRUE, highlight="lightyellow", grid=FALSE) {
+	dose <- match.arg(dose)
+	dose.units <- match.arg(dose.units)
+	volume <- match.arg(volume)
+	type <- match.arg(type)
+	alternative <- match.arg(alternative, choices=c("two.sided", "greater", "less"))
+	legend <- match.arg(legend, choices=c(NA, "topright", "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "right", "center"))
+	width <- match.arg(width, choices=c(NA, "range", "mad", "IQR", "quantile", "var", "sd"))
+	x <- new("DVH.list", lapply(x, convert.DVH, type=type, dose=dose, dose.units=dose.units, volume=volume))
+	x <- x[!unlist(lapply(x, is.empty))]
+	N.x <- length(x)
+	y <- new("DVH.list", lapply(y, convert.DVH, type=type, dose=dose, dose.units=dose.units, volume=volume))
+	y <- y[!unlist(lapply(y, is.empty))]
+	N.y <- length(y)
+	if (N.x < 2) {
+		stop("not enough 'x' observations")
+	}
+	if (N.y < 2) {
+		stop("not enough 'y' observations")
+	}
+	if (paired & (N.x != N.y)) {
+		stop("'x' and 'y' DVH comparison groups have differing lengths -- cannot compute pairwise statistics")
+	}
+	if (length(col) != 2) {
+		col <- rep(col[1], 2)
+	}
+	col.x <- col2rgb(col[1])/255
+	col.y <- col2rgb(col[2])/255	
+	if (length(lty) != 2) {
+		lty <- rep(lty[1], 2)
+	}
+	if (length(lwd) != 2) {
+		lwd <- rep(lwd[1], 2)
+	}
+	if (length(fill.transparency) != 2) {
+		fill.transparency <- rep(fill.transparency[1], 2)
+	}
+	if (length(line.transparency) != 2) {
+		line.transparency <- rep(line.transparency[1], 2)
+	}
+	if (length(fill.lty) != 2) {
+		fill.lty <- rep(fill.lty[1], 2)
+	}
+	if (length(angle) != 2) {
+		angle <- rep(angle[1], 2)
+	}
+	if (length(density) != 2) {
+		density <- rep(density[1], 2)
+	}	
+	data.ttest <- t.test(x, y, paired=paired, conf.level=1-alpha, alternative=alternative, mu=mu, volume=volume)
+	doses <- data.ttest$dose
+	if (new) {
+		layout(c(2,1),heights=c(1,4))
+		par(mar=c(4.1, 4.1, 0.5, 2.1))
+		if (is.null(xlim) | length(xlim) != 2) {
+			xlim <- range(doses)
+		}
+		if (is.null(ylim) | length(ylim) != 2) {
+			if (volume == "relative") {
+				ylim <- c(0, 100)
+			}
+			else {
+				ylim <- range(unlist(lapply(c(x, y), slot, "volumes")), na.rm=TRUE)
+			}
+		}
+		
+		plot(NULL, xlim=xlim, ylim=ylim, xlab=if (dose == "absolute") {paste("Dose (", dose.units, ")",sep="")} else {"Dose (%)"}, ylab=if (volume == "relative") {"Volume (%)"} else {"Volume (cc)"}, main="")
+		if (grid) grid()
+	}
+	if (is.na(width)) {
+		conf.int <- data.ttest$y.mean + data.ttest$conf.int2 - data.ttest$x.mean
+		conf.int[which(is.na(conf.int))] <- 0
+		var.x <- var(x)
+		var.x <- approx(var.x$dose, var.x$var, doses, yright=0, yleft=0)$y
+		var.y <- var(y)
+		var.y <- approx(var.y$dose, var.y$var, doses, yright=0, yleft=0)$y
+		sum.var <- var.x + var.y
+		var.x[which(sum.var != 0)] <- (var.x / sum.var)[which(sum.var != 0)]
+		var.y[which(sum.var != 0)] <- (var.y / sum.var)[which(sum.var != 0)]
+		x.upper <- data.ttest$x.mean+conf.int * var.x
+		x.lower <- data.ttest$x.mean-conf.int * var.x
+		y.upper <- data.ttest$y.mean+conf.int * var.y
+		y.lower <- data.ttest$y.mean-conf.int * var.y
+	}
+	else {
+		switch(width,
+			range = {
+				x.range <- quantile(x, probs=c(0, 1), type=7, na.rm=TRUE)
+				y.range <- quantile(y, probs=c(0, 1), type=7, na.rm=TRUE)
+				x.upper <- approx(x.range$dose, x.range$quantiles[2,], doses, yright=0, yleft=0)$y
+				x.lower <- approx(x.range$dose, x.range$quantiles[1,], doses, yright=0, yleft=0)$y
+				y.upper <- approx(y.range$dose, y.range$quantiles[2,], doses, yright=0, yleft=0)$y
+				y.lower <- approx(y.range$dose, y.range$quantiles[1,], doses, yright=0, yleft=0)$y
+			},
+			mad = {
+				x.range <- mad(x)
+				x.range <- approx(x.range$dose, x.range$mad*multiplier, doses, yright=0, yleft=0)$y
+				y.range <- mad(y)
+				y.range <- approx(y.range$dose, y.range$mad*multiplier, doses, yright=0, yleft=0)$y
+				x.upper <- data.ttest$x.mean+x.range
+				x.lower <- data.ttest$x.mean-x.range
+				y.upper <- data.ttest$y.mean+y.range
+				y.lower <- data.ttest$y.mean-y.range
+			},
+			IQR = {
+				x.range <- quantile(x, probs=c(0.25, 0.75), type=7, na.rm=TRUE)
+				y.range <- quantile(y, probs=c(0.25, 0.75), type=7, na.rm=TRUE)
+				x.upper <- approx(x.range$dose, x.range$quantiles[2,], doses, yright=0, yleft=0)$y
+				x.lower <- approx(x.range$dose, x.range$quantiles[1,], doses, yright=0, yleft=0)$y
+				y.upper <- approx(y.range$dose, y.range$quantiles[2,], doses, yright=0, yleft=0)$y
+				y.lower <- approx(y.range$dose, y.range$quantiles[1,], doses, yright=0, yleft=0)$y
+			},
+			quantile = {
+				if (length(quantile) != 2) {
+					quantile <- c(0.25, 0.75)
+				}
+				x.range <- quantile(x, probs=quantile, type=7, na.rm=TRUE)
+				y.range <- quantile(y, probs=quantile, type=7, na.rm=TRUE)
+				x.upper <- approx(x.range$dose, x.range$quantiles[2,], doses, yright=0, yleft=0)$y
+				x.lower <- approx(x.range$dose, x.range$quantiles[1,], doses, yright=0, yleft=0)$y
+				y.upper <- approx(y.range$dose, y.range$quantiles[2,], doses, yright=0, yleft=0)$y
+				y.lower <- approx(y.range$dose, y.range$quantiles[1,], doses, yright=0, yleft=0)$y
+			},
+			sd = {
+				x.range <- sd(x)
+				x.range <- approx(x.range$dose, x.range$sd*multiplier, doses, yright=0, yleft=0)$y
+				y.range <- sd(y)
+				y.range <- approx(y.range$dose, y.range$sd*multiplier, doses, yright=0, yleft=0)$y
+				x.upper <- data.ttest$x.mean+x.range
+				x.lower <- data.ttest$x.mean-x.range
+				y.upper <- data.ttest$y.mean+y.range
+				y.lower <- data.ttest$y.mean-y.range
+			},
+			var = {
+				x.range <- var(x)
+				x.range <- approx(x.range$dose, x.range$var*multiplier, doses, yright=0, yleft=0)$y
+				y.range <- var(y)
+				y.range <- approx(y.range$dose, y.range$var*multiplier, doses, yright=0, yleft=0)$y
+				x.upper <- data.ttest$x.mean+x.range
+				x.lower <- data.ttest$x.mean-x.range
+				y.upper <- data.ttest$y.mean+y.range
+				y.lower <- data.ttest$y.mean-y.range
+			}
+		)		
+	}
+	x.upper <- pmin(x.upper, ylim[2])
+	x.lower <- pmax(x.lower, ylim[1])
+	y.upper <- pmin(y.upper, ylim[2])
+	y.lower <- pmax(y.lower, ylim[1])
+	points(doses, x.upper, type="l",col=rgb(col.x[1],col.x[2],col.x[3],fill.transparency[1]), lty=fill.lty[1])
+	points(doses, x.lower, type="l",col=rgb(col.x[1],col.x[2],col.x[3],fill.transparency[1]), lty=fill.lty[1])
+	points(doses, y.upper, type="l",col=rgb(col.y[1],col.y[2],col.y[3],fill.transparency[2]), lty=fill.lty[2])
+	points(doses, y.lower, type="l",col=rgb(col.y[1],col.y[2],col.y[3],fill.transparency[2]), lty=fill.lty[2])
+	use.x <- (!(is.na(x.upper) | is.na(x.lower)))
+	use.y <- (!(is.na(y.upper) | is.na(y.lower)))
+	if (fill) {
+		polygon(c(doses[use.x], rev(doses[use.x])), c(x.upper[use.x], rev(x.lower[use.x])), col=rgb(col.x[1],col.x[2],col.x[3],fill.transparency[1]), border=NA, angle=angle[1], density=density[1], lty=fill.lty[1])
+   		polygon(c(doses[use.y], rev(doses[use.y])), c(y.upper[use.y], rev(y.lower[use.y])), col=rgb(col.y[1],col.y[2],col.y[3],fill.transparency[2]), border=NA, angle=angle[2], density=density[2],lty=fill.lty[2])
+	}
+	points(doses, data.ttest$x.mean, type="l", col=rgb(col.x[1],col.x[2],col.x[3],line.transparency[1]), lty=lty[1], lwd=lwd[1])
+	points(doses, data.ttest$y.mean, type="l", col=rgb(col.y[1],col.y[2],col.y[3],line.transparency[2]), lty=lty[2], lwd=lwd[2])
+	if (!is.na(legend)) {
+		if (length(legend.labels) >= 2) { 
+			legend(legend, legend=legend.labels[1:2], lty=lty, lwd=lwd, col=c(rgb(col.x[1],col.x[2],col.x[3],line.transparency[1]), rgb(col.y[1],col.y[2],col.y[3],line.transparency[2])), fill=if (fill) {c(rgb(col.x[1],col.x[2],col.x[3],fill.transparency[1]), rgb(col.y[1],col.y[2],col.y[3],fill.transparency[2]))} else {NULL}, density=density, angle=angle)
+		}
+		else {
+			legend(legend, legend=c("Group 1", "Group 2"), lty=lty, lwd=lwd, col=c(rgb(col.x[1],col.x[2],col.x[3],line.transparency[1]), rgb(col.y[1],col.y[2],col.y[3],line.transparency[2])), fill=if (fill) {c(rgb(col.x[1],col.x[2],col.x[3],fill.transparency[1]), rgb(col.y[1],col.y[2],col.y[3],fill.transparency[2]))} else {NULL}, density=density, angle=angle)
+		}
+	}
+	if (new) {
+		par(mar=c(0.1,4.1,2.1,2.1))
+		p <- data.ttest$p
+		plot(xlim, c(min(p, na.rm=TRUE)/10,1), type="n", xlab="", ylab="P-value", log="y", xaxt="n", yaxt="n", main=main)
+		rect(doses[which(p<alpha)],rep(alpha, length(which(p<alpha))), doses[which(p<alpha)], p[which(p<alpha)], col=highlight, border=highlight)
+		abline(h=alpha,lty="dotted",col="gray")
+		points(doses,p, type="l")
+		ticks <- axTicks(2, log=TRUE)	
+		ticks <- ticks[which(as.integer(log10(ticks))==log10(ticks))]
+		for (i in 1:length(ticks)) {
+			j <- log10(ticks[i])
+			axis(2, at=ticks[i], labels=substitute(10^j), las=1)
+		}
+	}
+}
+
+
+plot.DVH.wilcox <- function(x, y, ..., alternative=NULL, mu=0, paired=FALSE, exact=TRUE, correct=TRUE, alpha=0.05, col="black", lty="solid", lwd=1, line.transparency=1, fill.transparency=line.transparency/2, angle=45, density=NULL, fill=TRUE, fill.lty=lty, dose=c("absolute", "relative"), dose.units=c("cGy", "Gy"), volume=c("relative", "absolute"), type=c("cumulative", "differential"), main="", xlim=NULL, ylim=NULL, legend=c(NA, "topright", "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "right", "center"), legend.labels=NULL, new=TRUE, highlight="lightyellow", panel.lower=c("wilcox", "grouped"), grid=FALSE) {
+	dose <- match.arg(dose)
+	dose.units <- match.arg(dose.units)
+	volume <- match.arg(volume)
+	type <- match.arg(type)
+	alternative <- match.arg(alternative, choices=c("two.sided", "greater", "less"))
+	legend <- match.arg(legend)	
+	panel.lower <- match.arg(panel.lower)
+	x <- new("DVH.list", lapply(x, convert.DVH, type=type, dose=dose, dose.units=dose.units, volume=volume))
+	x <- x[!unlist(lapply(x, is.empty))]
+	N.x <- length(x)
+	y <- new("DVH.list", lapply(y, convert.DVH, type=type, dose=dose, dose.units=dose.units, volume=volume))
+	y <- y[!unlist(lapply(y, is.empty))]
+	N.y <- length(y)
+	if (N.x < 2) {
+		stop("not enough 'x' observations")
+	}
+	if (N.y < 2) {
+		stop("not enough 'y' observations")
+	}
+	if (length(col) != 2) {
+		col <- rep(col[1], 2)
+	}
+	col.x <- col2rgb(col[1])/255
+	col.y <- col2rgb(col[2])/255	
+	if (length(lty) != 2) {
+		lty <- rep(lty[1], 2)
+	}
+	if (length(lwd) != 2) {
+		lwd <- rep(lwd[1], 2)
+	}
+	if (length(fill.transparency) != 2) {
+		fill.transparency <- rep(fill.transparency[1], 2)
+	}
+	if (length(line.transparency) != 2) {
+		line.transparency <- rep(line.transparency[1], 2)
+	}
+	if (length(fill.lty) != 2) {
+		fill.lty <- rep(fill.lty[1], 2)
+	}
+	if (length(angle) != 2) {
+		angle <- rep(angle[1], 2)
+	}
+	if (length(density) != 2) {
+		density <- rep(density[1], 2)
+	}	
+	data.wilcox <- wilcox.test(x, y, paired=paired, conf.level=1-alpha, alternative=alternative, mu=mu, exact=exact, correct=correct, volume=volume)
+	doses <- data.wilcox$dose
+	if (new) {
+		layout(c(2,1),heights=c(1,4))
+		par(mar=c(4.1, 4.1, 0.5, 2.1))
+
+		if (is.null(xlim) | length(xlim) != 2) {
+			xlim <- range(doses)
+		}
+		if (is.null(ylim) | length(ylim) != 2) {
+			if (panel.lower == "wilcox") {
+				ylim <- range(c(data.wilcox$conf.int1, data.wilcox$conf.int2), na.rm=TRUE)
+			}
+			else if (volume == "relative") {
+				ylim <- c(0, 100)
+			}
+			else {
+				ylim <- range(unlist(lapply(c(x, y), slot, "volumes")), na.rm=TRUE)
+			}
+		}
+		
+		plot(NULL, xlim=xlim, ylim=ylim, xlab=if (dose == "absolute") {paste("Dose (", dose.units, ")",sep="")} else {"Dose (%)"}, ylab=if (volume == "relative") {"Volume (%)"} else {"Volume (cc)"}, main="")
+		if (grid) grid()
+	}
+	if (panel.lower == "wilcox") {
+		x.upper <- pmax(pmin(data.wilcox$conf.int1, ylim[2]), ylim[1])
+		x.lower <- pmin(pmax(data.wilcox$conf.int2, ylim[1]), ylim[2])
+		abline(h=0,lty="dotted",col="gray")
+		points(doses, x.upper, type="l",col=rgb(col.x[1],col.x[2],col.x[3],fill.transparency[1]), lty=fill.lty[1])
+		points(doses, x.lower, type="l",col=rgb(col.x[1],col.x[2],col.x[3],fill.transparency[1]), lty=fill.lty[1])
+		use.x <- (!(is.na(x.upper) | is.na(x.lower)))
+		if (fill) {
+			polygon(c(doses[use.x], rev(doses[use.x])), c(x.upper[use.x], rev(x.lower[use.x])), col=rgb(col.x[1],col.x[2],col.x[3],fill.transparency[1]), border=NA, angle=angle[1], density=density[1], lty=fill.lty[1])
+		}
+		points(doses, data.wilcox$estimate, type="l", col=rgb(col.x[1],col.x[2],col.x[3],line.transparency[1]), lty=lty[1], lwd=lwd[1])
+	}
+	else if (panel.lower == "grouped") {
+		plot.DVH.groups(x, y, new=FALSE, col=col, lty=lty, lwd=lwd, line.transparency=line.transparency, fill.transparency=fill.transparency, legend=legend, legend.labels=legend.labels, dose=dose, dose.units=dose.units, volume=volume, type=type, xlim=xlim, ylim=ylim, fill=fill, angle=angle, density=density, fill.lty=fill.lty, ...)
+	}
+	if (new) {
+		par(mar=c(0.1,4.1,2.1,2.1))
+		p <- data.wilcox$p
+		plot(xlim, c(min(p, na.rm=TRUE)/10,1), type="n", xlab="", ylab="P-value", log="y", xaxt="n", yaxt="n", main=main)
+		rect(doses[which(p<alpha)],rep(alpha, length(which(p<alpha))), doses[which(p<alpha)], p[which(p<alpha)], col=highlight, border=highlight)
+		abline(h=alpha,lty="dotted",col="gray")
+		suppressWarnings(points(doses,p, type="l"))
+		ticks <- axTicks(2, log=TRUE)	
+		ticks <- ticks[which(as.integer(log10(ticks))==log10(ticks))]
+		for (i in 1:length(ticks)) {
+			j <- log10(ticks[i])
+			axis(2, at=ticks[i], labels=substitute(10^j), las=1)
+		}
+	}	
+}
+
+
+
+
+plot.DVH.bars <- function(x, ..., new=TRUE, legend=TRUE, legend.labels=NULL, dose=c("absolute", "relative"), dose.units=c("cGy", "Gy"), volume=c("relative", "absolute"), main="", col=rev(rainbow(n=10, start=0, end=2/3))) {
+	dose <- match.arg(dose)
+	dose.units <- match.arg(dose.units)
+	volume <- match.arg(volume)
+	x <- c(x, ...)
+	x <- new("DVH.list", lapply(x, convert.DVH, type="differential", dose=dose, dose.units=dose.units, volume=volume))
+	N <- length(x)
+	if (N <= 0) {
+		stop("no data to plot DVH")
+	}
+	doses <- var(x)$dose
+	N.dose <- length(doses)	
+	colors <- colorRampPalette(col)(N.dose)
+	if (volume == "relative") {
+		max.vol <- rep(100, N)
+		plot(NULL, xlim=c(0,N+1), ylim=c(0,100), xlab="", ylab="Volume (%)", xaxt="n", main=main)
+		for (i in 1:N) {
+			x.i <- approx(x[[i]]$doses, x[[i]]$volumes, doses, yleft=0, yright=0)$y
+			x.i <- diffinv(100*x.i/sum(x.i))
+			rect(i-0.35, x.i[1:N.dose], i+0.35, x.i[2:length(x.i)], border=NA, col=colors)
+			rect(i-0.35,0,i+0.35,100)
+		}
+	}
+	else {
+		max.vol <- max(unlist(lapply(x, slot, "structure.volume")), na.rm=TRUE)
+		plot(NULL, xlim=c(0,N+1), ylim=c(0, max.vol), xlab="", ylab="Volume (cc)", xaxt="n", main="")
+		for (i in 1:N) {
+			vol.i <- x[[i]]$structure.volume
+			x.i <- approx(x[[i]]$doses, x[[i]]$volumes, doses, yleft=0, yright=0)$y
+			x.i <- diffinv(vol.i*x.i/sum(x.i))
+			rect(i-0.35, x.i[1:N.dose], i+0.35, x.i[2:length(x.i)], border=NA, col=colors)
+			rect(i-0.35,0,i+0.35,vol.i)
+		}
+	}
+	left <- par("usr")[1]
+	right <- par("usr")[2]
+	dist <- right - left
+	rect(left + dist*(1:N.dose - 1)/N.dose, par("usr")[4], left+dist*(1:N.dose/N.dose), par("usr")[4]+max.vol/25, border=NA, col=colors, xpd=TRUE)
+	if (legend) {
+		if (length(legend.labels) != N) {
+			legend.labels <- unlist(lapply(x, slot, "structure.name"))
+		}
+		text(1:N, par("usr")[3], labels=paste(substr(legend.labels, 1, 12), " ", sep=""), srt=45, xpd=TRUE, adj=1)
+	}
+	ax.labs <- pretty(doses)
+	at.labs <- left +(dist)*ax.labs/max(doses, na.rm=TRUE)
+	axis(3, at=at.labs, labels=ax.labs, tick=FALSE)
+	for (i in 1:length(ax.labs)) {
+		rect(c(left,at.labs)[i], par("usr")[4], min(at.labs[i],right), par("usr")[4]+max.vol/25, xpd=TRUE)	
+	}
+	mtext(if (dose == "relative") {"Dose (%)"} else {paste("Dose (", dose.units, ")",sep="")}, at=(left + right)/2, line=2, xpd=TRUE)
+	mtext(main, at=left, line=2, xpd=TRUE, font=2)
+}
+
+
+plot.DVH.individual <- function(x, ..., col="black", lty ="solid", lwd=1, line.transparency=1, new=TRUE, legend=NULL, legend.labels=NULL, dose=c("absolute", "relative"), dose.units=c("cGy", "Gy"), volume=c("relative", "absolute"), type=c("cumulative", "differential"), main="", xlim=NULL, ylim=NULL, grid=FALSE) {
+	dose <- match.arg(dose)
+	dose.units <- match.arg(dose.units)
+	volume <- match.arg(volume)
+	type <- match.arg(type)
+	legend <- match.arg(legend, choices=c(NA, "topright", "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "right", "center"))
+	x <- c(x, ...)
+	x <- new("DVH.list", lapply(x, convert.DVH, type=type, dose=dose, dose.units=dose.units, volume=volume))
+	N <- length(x)
+	if (N <= 0) {
+		stop("no data to plot DVH")
+	}
+	if (length(col) != N) {
+		col <- rep(col[1], N)
+	}
+	if (length(lty) != N) {
+		lty <- rep(lty[1], N)
+	}
+	if (length(lwd) != N) {
+		lwd <- rep(lwd[1], N)
+	}
+	if (length(line.transparency) != N) {
+		line.transparency <- rep(line.transparency[1], N)
+	}
+	if (new) {	
+
+		if (is.null(xlim) | length(xlim) != 2) {
+			xlim <- range(x)
+		}
+		if (is.null(ylim) | length(ylim) != 2) {
+			ylim <- range(unlist(lapply(x, slot, "volumes")))
+		}
+
+		plot(NULL, xlim=xlim, ylim=ylim, xlab=if (dose == "absolute") {paste("Dose (", dose.units, ")",sep="")} else {"Dose (%)"}, ylab=if (volume == "relative") {"Volume (%)"} else {"Volume (cc)"}, main=main)
+		if (grid) grid()
+	}
+	for (i in 1:N) {
+		col.i <- col2rgb(col[i])/255
+		points(x[[i]]$doses, x[[i]]$volumes, type="l", lty=lty[i], lwd=lwd[i], col=rgb(col.i[1],col.i[2],col.i[3],line.transparency[i]))
+	}
+	if (!is.na(legend)) {		 
+		legend(legend, legend=if (length(legend.labels) >= N) {legend.labels[1:N]} else {paste("Structure", 1:N)}, lty=lty, lwd=lwd, col=col)
+	}
+}
+
+plot.DVH.groups <- function(x, ..., col="black", lty ="solid", lwd=1, line.transparency=1, fill.transparency=line.transparency/2, new=TRUE, legend=c(NA, "topright", "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "right", "center"), legend.labels=NULL, dose=c("absolute", "relative"), dose.units=c("cGy", "Gy"), volume=c("relative", "absolute"), type=c("cumulative", "differential"), width=NULL, main="", xlim=NULL, ylim=NULL, multiplier=1, quantile=c(0.25, 0.75), fill=TRUE, angle=45, density=NULL, fill.lty=lty, grid=FALSE) {
+	dose <- match.arg(dose)
+	dose.units <- match.arg(dose.units)
+	volume <- match.arg(volume)
+	type <- match.arg(type)
+	width <- match.arg(width, choices=c("range", "mad", "IQR", "quantile", "var", "sd"))
+	multiplier <- max(0, multiplier, na.rm=TRUE)
+	legend <- match.arg(legend)
+	groups <- c(list(x), list(...))
+	classes <- unlist(lapply(groups, class))
+	which.DVH <- which(classes %in% c("DVH", "DVH.list"))
+	classes <- classes[which.DVH]
+	groups <- groups[which.DVH]
+	N <- length(classes)
+	if (length(col) != N) {
+		col <- rep(col[1], N)
+	}
+	if (length(lty) != N) {
+		lty <- rep(lty[1], N)
+	}
+	if (length(lwd) != N) {
+		lwd <- rep(lwd[1], N)
+	}
+	if (length(fill.transparency) != N) {
+		fill.transparency <- rep(fill.transparency[1], N)
+	}
+	if (length(line.transparency) != N) {
+		line.transparency <- rep(line.transparency[1], N)
+	}
+	if (length(fill.lty) != N) {
+		fill.lty <- rep(fill.lty[1], N)
+	}
+	if (length(angle) != N) {
+		angle <- rep(angle[1], N)
+	}
+	if (length(density) != N) {
+		density <- rep(density[1], N)
+	}	
+	range.dose <- NA
+	range.volume <- NA
+	for (i in 1:N) {
+		if (classes[i] == "DVH.list") {
+			groups[[i]] <- new("DVH.list", lapply(groups[[i]], convert.DVH, type=type, dose=dose, dose.units=dose.units, volume=volume))
+			range.dose <- range(range.dose, range(groups[[i]]), na.rm=TRUE)
+			range.volume <- range(range.volume, range(unlist(lapply(groups[[i]], slot, "volumes"))), na.rm=TRUE)
+		}
+		else {
+			groups[[i]] <- convert.DVH(groups[[i]], type=type, dose=dose, dose.units=dose.units, volume=volume)
+			range.dose <- range(range.dose, range(groups[[i]]), na.rm=TRUE)
+			range.volume <- range(range.volume, range(slot(groups[[i]], "volumes")), na.rm=TRUE)
+		}
+	}
+	if (new) {
+
+		if (is.null(xlim) | length(xlim) != 2) {
+			xlim <- range.dose
+		}
+		if (is.null(ylim) | length(ylim) != 2) {
+			ylim <- range.volume
+		}
+
+		plot(NULL, xlim=xlim, ylim=ylim, xlab=if (dose == "absolute") {paste("Dose (", dose.units, ")",sep="")} else {"Dose (%)"}, ylab=if (volume == "relative") {"Volume (%)"} else {"Volume (cc)"}, main=main)
+		if (grid) grid()
+	}
+	y.max <- par("usr")[4]
+	for (i in 1:N) {
+		col.i <- col2rgb(col[i])/255
+		if (classes[i] == "DVH.list") {
+			if (fill) {
+				switch(width,
+					range = {
+						DVH.center <- mean(groups[[i]], type=type, dose=dose, dose.units=dose.units, volume=volume)
+						DVH.range <- quantile(groups[[i]], probs=c(0, 1), type=7, na.rm=TRUE)
+						polygon(c(DVH.range$dose, rev(DVH.range$dose)), c(pmax(DVH.range$quantiles[1,], 0), rev(pmin(DVH.range$quantiles[2,], y.max))), col=rgb(col.i[1],col.i[2],col.i[3],fill.transparency[i]), border=rgb(col.i[1],col.i[2],col.i[3],fill.transparency[i]), angle=angle[i], density=density[i], lty=fill.lty[i])
+					},
+					mad = {
+						DVH.center <- median(groups[[i]])
+						DVH.range <- mad(groups[[i]])
+						polygon(c(DVH.range$dose, rev(DVH.range$dose)), c(pmax(DVH.center$volumes-DVH.range$mad*multiplier, 0), rev(pmin(DVH.center$volumes+DVH.range$mad*multiplier, y.max))), col=rgb(col.i[1],col.i[2],col.i[3],fill.transparency[i]), border=rgb(col.i[1],col.i[2],col.i[3],fill.transparency[i]), angle=angle[i], density=density[i], lty=fill.lty[i])
+					},
+					IQR = {
+						DVH.center <- median(groups[[i]])
+						DVH.range <- quantile(groups[[i]], probs=c(0.25, 0.75), type=7, na.rm=TRUE)
+						polygon(c(DVH.range$dose, rev(DVH.range$dose)), c(pmax(DVH.range$quantiles[1,], 0), rev(pmin(DVH.range$quantiles[2,], y.max))), col=rgb(col.i[1],col.i[2],col.i[3],fill.transparency[i]), border=rgb(col.i[1],col.i[2],col.i[3],fill.transparency[i]), angle=angle[i], density=density[i], lty=fill.lty[i])
+					},
+					quantile = {
+						if (length(quantile) != 2) {
+							quantile <- c(0.25, 0.75)
+						}
+						DVH.center <- quantile(groups[[i]], probs=mean(quantile), type=7, na.rm=TRUE)
+						names(DVH.center) <- c("doses", "volumes")
+						DVH.range <- quantile(groups[[i]], probs=quantile, type=7, na.rm=TRUE)
+						polygon(c(DVH.range$dose, rev(DVH.range$dose)), c(pmax(DVH.range$quantiles[1,], 0), rev(pmin(DVH.range$quantiles[2,], y.max))), col=rgb(col.i[1],col.i[2],col.i[3],fill.transparency[i]), border=rgb(col.i[1],col.i[2],col.i[3],fill.transparency[i]), angle=angle[i], density=density[i], lty=fill.lty[i])
+					},
+					sd = {
+						DVH.center <- mean(groups[[i]], type=type, dose=dose, dose.units=dose.units, volume=volume)
+						DVH.range <- sd(groups[[i]])
+						polygon(c(DVH.range$dose, rev(DVH.range$dose)), c(pmax(DVH.center$volumes-DVH.range$sd*multiplier, 0), rev(pmin(DVH.center$volumes+DVH.range$sd*multiplier, y.max))), col=rgb(col.i[1],col.i[2],col.i[3],fill.transparency[i]), border=rgb(col.i[1],col.i[2],col.i[3],fill.transparency[i]), angle=angle[i], density=density[i], lty=fill.lty[i])
+					},
+					var = {
+						DVH.center <- mean(groups[[i]], type=type, dose=dose, dose.units=dose.units, volume=volume)
+						DVH.range <- var(groups[[i]])
+						polygon(c(DVH.range$dose, rev(DVH.range$dose)), c(pmax(DVH.center$volumes-DVH.range$var*multiplier, 0), rev(pmin(DVH.center$volumes+DVH.range$var*multiplier, y.max))), col=rgb(col.i[1],col.i[2],col.i[3],fill.transparency[i]), border=rgb(col.i[1],col.i[2],col.i[3],fill.transparency[i]), angle=angle[i], density=density[i], lty=fill.lty[i])
+					}
+				)
+			}
+			points(DVH.center$doses, DVH.center$volumes, type="l", col=rgb(col.i[1],col.i[2],col.i[3],line.transparency[i]), lty=lty[i], lwd=lwd[i])
+		}
+		else {
+			points(groups[[i]]$doses, groups[[i]]$volumes, type="l", lty=lty[i], lwd=lwd[i], col=rgb(col.i[1],col.i[2],col.i[3],line.transparency[i]))
+		}		
+	}	
+	if (!is.na(legend)) {
+		col <- col2rgb(col)/255
+		legend(legend, legend=if (length(legend.labels) >= N) {legend.labels[1:N]} else {paste("Group", 1:N)}, lty=lty, lwd=lwd, col=rgb(col[1,],col[2,],col[3,],line.transparency), fill=if (fill) {rgb(col[1,],col[2,],col[3,],fill.transparency)} else {NULL}, density=density, angle=angle)
+	}	
+}
+
+
+plot.DVH.corr <- function(x, y, ..., col="black", lty="solid", lwd=1, alpha=0.05, dose=c("absolute", "relative"), dose.units=c("cGy", "Gy"), volume=c("relative", "absolute"), type=c("cumulative", "differential"), method=NULL, alternative=NULL, exact=NULL, main="", xlim=NULL, ylim=NULL, new=TRUE, highlight="lightyellow", grid=FALSE, density=NULL, angle=45) {
+	dose <- match.arg(dose)
+	dose.units <- match.arg(dose.units)
+	volume <- match.arg(volume)
+	type <- match.arg(type)
+	method <- match.arg(method, choices=c("pearson", "kendall", "spearman"))
+	alternative <- match.arg(alternative, choices=c("two.sided", "less", "greater"))
+	x <- new("DVH.list", lapply(x, convert.DVH, type=type, dose=dose, dose.units=dose.units, volume=volume))
+	x <- x[!unlist(lapply(x, is.empty))]
+	N.x <- length(x)
+	y <- as.numeric(y)
+	N.y <- length(y)
+	if (N.x < 2) {
+		stop("not enough 'x' observations")
+	}
+	if (N.y < 2) {
+		stop("not enough 'y' observations")
+	}
+	if (N.x != N.y) {
+		stop("'x' and 'y' must have the same length -- cannot compute pairwise correlation")
+	}
+	if (length(lty) != 2) {
+		lty <- rep(lty[1], 2)
+	}
+	if (length(lwd) != 2) {
+		lwd <- rep(lwd[1], 2)
+	}
+	doses <- var(x)$dose
+	data.x <- matrix(NA, nrow=length(doses), ncol=N.x)
+	for (i in 1:N.x) {
+		data.x[,i] <- approx(x[[i]]$doses, x[[i]]$volumes, doses, rule=2)$y
+	}
+	corr <- p <- rep(NA, length(doses))
+	options(warn = -1)
+	for (i in 1:length(doses)) {
+		t.i <- 1
+		try(t.i <- cor.test(data.x[i,], y, alternative=alternative, method=method, exact=exact, conf.level=1-alpha), silent=TRUE)
+		if (identical(t.i, 1)) {
+			corr[i] <- p[i] <- NA
+		}
+		else {
+			corr[i] <- t.i$estimate
+			p[i] <- t.i$p.value
+		}
+	}
+	options(warn = 0)
+
+	if (new) {
+		layout(c(2,1),heights=c(1,4))
+		par(mar=c(4.1, 4.1, 0.5, 2.1))
+		if (is.null(xlim) | length(xlim) != 2) {
+			xlim <- range(doses)
+		}
+		if (is.null(ylim) | length(ylim) != 2) {
+			if (volume == "relative") {
+				ylim <- c(0, 100)
+			}
+			else {
+				ylim <- range(unlist(lapply(x, slot, "volumes")), na.rm=TRUE)
+			}
+		}
+		
+		plot(NULL, xlim=xlim, ylim=ylim, xlab=if (dose == "absolute") {paste("Dose (", dose.units, ")",sep="")} else {"Dose (%)"}, ylab=if (volume == "relative") {"Volume (%)"} else {"Volume (cc)"}, main="")
+		if (grid) grid()
+	}
+	for (i in 1:N.x) {
+		points(doses, data.x[,i], type="l", col="black", lty=lty[1], lwd=lwd[1])
+	}
+	if (new) {
+		par(mar=c(0.1,4.1,2.1,2.1))
+		plot(xlim, c(-1,1), type="n", xlab="", ylab=paste("R (", method, ")", sep=""), xaxt="n", yaxp=c(-1,1,2), main=main)
+		rect(doses[which(p<alpha)],rep(-1, length(which(p<alpha))), doses[which(p<alpha)], rep(1, length(which(p<alpha))), col=highlight, border=highlight)
+		points(doses, corr, type="l", col=col)
+		abline(h=0,lty="dotted",col="gray")
+	}
+}
+#line 1 "/Users/thompsre/RadOnc/R/read.DICOM.RT.R"
+
+read.DICOM.RT <- function(path, exclude=NULL, recursive=TRUE, verbose=TRUE, limit=NULL, DVH=TRUE, zDVH=FALSE, modality="CT", ...) {
+	modality <- match.arg(toupper(modality), choices=c("CT", "MR"))
+	if (length(list.files(path)) == 0 && file.exists(path)) {
+    	filenames <- path
+	}
+	else {
+      filenames <- list.files(path, full.names=TRUE, recursive=recursive)
+    }
+	if (! is.null(exclude)) {
+    	filenames <- grep(exclude, filenames, ignore.case=TRUE, value=TRUE, invert=TRUE)
+  	}
+  	nfiles <- length(filenames)
+  	if (nfiles < 1) {
+  		warning("No files to read from path '", path, "'", sep="")
+  		return()
+  	}
+	if (verbose) {
+		cat("Reading ", nfiles, " DICOM files from path: '", path, "' ... ", sep="")
+	}
+	DICOMs <- list()
+    for (i in 1:nfiles) {
+    	if (grepl("RTSTRUCT", filenames[i])) {
+			dcm <- readDICOMFile(filenames[i], pixelData=FALSE)
+    	}
+    	else {
+			dcm <- readDICOMFile(filenames[i], ...)
+    	}
+        DICOMs$img[[i]] <- dcm$img
+        DICOMs$hdr[[i]] <- dcm$hdr
+    }
+	
+	if (verbose) {
+		cat("FINISHED\nExtracting ", modality, " data ... ", sep="")
+	}
+	modalities <- as.character(unlist(lapply(DICOMs$hdr, function(x) {x[which(x[,"name"]=="Modality"), "value"]})))
+
+################################
+## IMPORT CT/MR IMAGE FILE(S) ##
+################################	
+
+	CT <- as.numeric(which(modalities == modality))
+	if (length(CT) >= 1) {
+		hdr.name <- as.character(DICOMs$hdr[[CT[1]]][,"name"])
+		frame.ref.CT <- as.character(DICOMs$hdr[[CT[1]]][which(hdr.name == "FrameOfReferenceUID"), "value"])
+		## ASSUMES CONSTANT VOXEL SIZE AND SLICE THICKNESS FOR ALL DICOM FILES IN CT!!!!
+		voxel.size <- as.numeric(unlist(strsplit(DICOMs$hdr[[CT[1]]][which(hdr.name == "PixelSpacing"), "value"], " ")))
+		image.position <- as.numeric(unlist(strsplit(DICOMs$hdr[[CT[1]]][which(hdr.name == "ImagePositionPatient"), "value"], " ")))
+		z.slices <- unlist(lapply(DICOMs$hdr[CT], function(x) { as.numeric(unlist(strsplit(x[which(x[,"name"] == "ImagePositionPatient"), "value"], " "))[3]) }))
+		voxel.size <- c(voxel.size, as.numeric(DICOMs$hdr[[CT[1]]][which(hdr.name == "SliceThickness"), "value"]))
+		patient.name <- as.character(DICOMs$hdr[[CT[1]]][which(hdr.name == "PatientsName"), "value"])
+		patient.ID <- as.character(DICOMs$hdr[[CT[1]]][which(hdr.name == "PatientID"), "value"])
+		slope <- ifelse(("RescaleSlope" %in% hdr.name), as.numeric(DICOMs$hdr[[CT[1]]][which(hdr.name == "RescaleSlope"), "value"]), 1)
+		intercept <- ifelse(("RescaleIntercept" %in% hdr.name), as.numeric(DICOMs$hdr[[CT[1]]][which(hdr.name == "RescaleIntercept"), "value"]), 0)
+		CT <- create3D(list(hdr=DICOMs$hdr[CT], img=DICOMs$img[CT]))
+		CT <- CT*slope + intercept
+		dimnames(CT) <- list((1:dim(CT)[1]-1)*voxel.size[1]+image.position[1], (1:dim(CT)[2]-1)*voxel.size[2]+image.position[2], z.slices) 
+		if (verbose) {
+			cat("FINISHED [", length(z.slices), " slices, ", paste(sprintf("%.*f", 1, voxel.size), collapse="x", sep=""), "mm res]\n", sep="")
+		}
+	}
+	else {
+		cat("ERROR (no ", modality, " data available)\n", sep="")
+		CT <- NULL
+		frame.ref.CT <- NA
+		patient.name <- NA
+		patient.ID <- NA
+	}
+	
+	if (length(which(modalities == "RTPLAN")) < 1) {
+		dose.rx <- NA		
+	}
+#################################
+## IMPORT RT PLAN PARAMETER(S) ##
+#################################	
+
+	for (i in as.numeric(which(modalities == "RTPLAN"))) {
+		if (verbose) {
+			cat("Reading RT plan information from file: '", filenames[i], "' ... ", sep="")
+		}
+		if (inherits(try(DICOM.i <- readDICOMFile(filenames[i], skipSequence=FALSE), silent=TRUE), "try-error")) {
+			if (verbose) {
+				warning("Unable to read DICOM file: ", filenames[i])
+				cat("ERROR\n")
+			}
+			next
+		}
+		N.fractions <- as.numeric(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "NumberOfFractionsPlanned"), "value"])
+		structureset.exists <- toupper(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "RTPlanGeometry"), "value"]) == "PATIENT"
+		if (structureset.exists) {
+			structureset.ID <- as.character(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "ReferencedSOPInstanceUID"), "value"])
+		}
+		else {
+			structureset.ID <- ""
+		}
+		dose.ref.type <- unique(toupper(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "DoseReferenceType"), "value"]))
+		if ((length(which(DICOM.i$hdr[,"name"] == "DoseReferenceSequence")) == 1) & (length(dose.ref.type) == 1)) {
+			switch(dose.ref.type,
+				TARGET = {
+					dose.rx <- max(as.numeric(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "TargetPrescriptionDose"), "value"]), na.rm=TRUE)			
+				},
+				ORGAN_AT_RISK = {
+					dose.rx <- max(as.numeric(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "DeliveryMaximumDose"), "value"]), na.rm=TRUE)			
+				},
+				dose.rx <- NA
+			)
+		}
+		else {
+			dose.rx <- NA
+		}
+		if (verbose) {
+			cat("FINISHED\n")
+		}
+	}
+	
+#########################
+## IMPORT DOSE GRID(S) ##
+#########################	
+
+	doses <- c()
+	for (i in as.numeric(which(modalities == "RTDOSE"))) {
+		if (verbose) {
+			cat("Reading dose grid from file: '", filenames[i], "' ... ", sep="")
+		}
+		if (length(doses) > 1) {
+			warning("Multiple dose grid files specified (may only use one dose grid at a time)")
+			cat("ERROR\n")
+			break
+		}
+		if (inherits(try(DICOM.i <- readDICOMFile(filenames[i], skipSequence=FALSE), silent=TRUE), "try-error")) {
+			if (verbose) {
+				warning("Unable to read DICOM file: ", filenames[i])
+				cat("ERROR\n")
+			}
+			next
+		}
+		DICOMs$hdr[[i]] <- DICOM.i$hdr
+		frame.ref.CT.i <- as.character(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "FrameOfReferenceUID"), "value"])
+
+		if (length(frame.ref.CT.i) > 1) {
+			frame.ref.CT.i <- frame.ref.CT.i[which(frame.ref.CT.i != "")]
+			if (length(unique(frame.ref.CT.i)) > 1) {
+				frame.ref.CT.i <- frame.ref.CT[1]
+				warning("Ambiguous reference frame in dose grid file")
+			}
+		}		
+		if (length(frame.ref.CT.i) < 1) {
+			frame.ref.CT.i <- frame.ref.CT
+			if (verbose) {
+				warning("No reference frame in dose grid file")
+				if (is.na(frame.ref.CT)) {
+					cat("ERROR\n")
+					next
+				}
+			}
+		}
+		if (!is.na(frame.ref.CT) & (frame.ref.CT != frame.ref.CT.i)) {
+			if (verbose) {
+				warning("Reference frame mismatch")
+				cat("ERROR\n")
+			}			
+			next
+		}
+		pixel.size <- as.numeric(unlist(strsplit(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "PixelSpacing"), "value"], " ")))
+		z.size <- mean(diff(as.numeric(unlist(strsplit(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "GridFrameOffsetVector"), "value"], " ")))))
+		image.origin <- as.numeric(unlist(strsplit(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "ImagePositionPatient"), "value"], " ")))
+		grid.scale <- as.numeric(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "DoseGridScaling"), "value"])
+		dose.units <- toupper(DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "DoseUnits"), "value"])
+		plan.type <- DICOM.i$hdr[which(DICOM.i$hdr[,"name"] == "DoseSummationType"), "value"]
+		# Type of Dose Summation... Defined Terms: PLAN = dose calculated for entire RT Plan MULTI_PLAN = dose calculated for 2 or more RT Plans FRACTION = dose calculated for a single Fraction Group within RT Plan BEAM = dose calculated for one or more Beams within RT Plan BRACHY = dose calculated for one or more Brachy Application Setups within RT Plan CONTROL_POINT = dose calculated for one or more Control Points within a Beam
+		DICOMs$img[[i]] <- DICOM.i$img * grid.scale
+		temp <- array(data=NA, dim=dim(DICOM.i$img)[c(2:1,3)])
+		for (j in 1:dim(DICOM.i$img)[3]) {
+			temp[,,j] <- t(DICOMs$img[[i]][,,j])
+		}
+		dimnames(temp) <- list(
+			(1:dim(temp)[1]-1)*pixel.size[1]+image.origin[1],
+			rev(2*mean(range(as.numeric(dimnames(CT)[[2]]))) - (((1:dim(temp)[2])-1)*pixel.size[2]+image.origin[2])),
+			(1:dim(temp)[3]-1)*z.size+image.origin[3]
+		)
+		DICOMs$img[[i]] <- temp
+		if (length(unique(dose.units)) != 1) {
+			warning("Disagreement of dose specification within dose grid file")
+			if (verbose) {
+				cat("ERROR\n")
+			}
+			doses <- c(doses, NA)
+			next
+		}
+		dose.units <- dose.units[1]
+		switch(dose.units,
+			GY = dose.units <- "Gy",
+			CGY = dose.units <- "cGy",
+			{
+				warning("Dose not specified as 'Gy' or 'cGy'")
+				if (verbose) {
+					cat("ERROR\n")
+				}
+				doses <- c(doses, NA)
+				next
+			}
+		)
+		if (verbose) {
+			cat("[Dose type = ", plan.type, ", Units = ", dose.units, "] ", sep="")
+		}
+		attr(DICOMs$img[[i]], "dose.units") <- dose.units
+		doses <- c(doses, list(DICOMs$img[[i]]))
+#		doses.hdr <- DICOM.i$hdr
+		if (verbose) {
+			cat("FINISHED\n")
+		}
+		## EXTRACT DVH DATA
+#		if (FALSE) { ### THE FOLLOWING COMMANDS BYPASSED DUE TO UNRELIABILITY OF DVHs STORED WITHIN DICOM-RT DATA
+#		if (DVH) {
+#			if (verbose) {
+#				cat("Extracting existent DVHs ... ", sep="")
+#			}
+#			dvh.start <- which(DICOM.i$hdr[,"name"] == "DVHType")
+#			dvh.end <- which(DICOM.i$hdr[,"name"] == "DVHMeanDose")
+#			if (length(dvh.start) < 1) {
+#				warning(paste("Dose file '", file, "' contained no recognizable DVH structure(s)", sep=""))
+#				if (verbose) {
+#					cat("ERROR\n")
+#				}
+#				next
+#			}
+#			else if (length(dvh.start) == 1) {
+ #  			 	dvhs <- list(DICOM.i$hdr[dvh.start:dvh.end,])	
+#			}
+#			else {
+#				dvhs <- mapply(function(start, end) list(DICOM.i$hdr[start:end,]), dvh.start, dvh.end)
+#			}
+#			DVH.list <- lapply(dvhs,
+#				function(dvh) {
+#					ID <- dvh[which(dvh[, "name"] == "ReferencedROINumber"), "value"]
+#					type <- toupper(dvh[which(dvh[, "name"] == "DVHType"), "value"])
+#					switch(type,
+#						CUMULATIVE = type <- "cumulative",
+#						DIFFERENTIAL = type <- "differential"
+#					)
+#					dose.units <- toupper(dvh[which(dvh[, "name"] == "DoseUnits"), "value"])
+#					switch(dose.units,
+#						GY = dose.units <- "Gy",
+#						CGY = dose.units <- "cGy",
+#						{
+#							warning("Dose not specified as 'Gy' or 'cGy'")
+#							return(new("DVH", patient=patient.name, ID=patient.ID, structure.name=ID))
+#						}
+#					)
+#					vol.units <- toupper(dvh[which(dvh[, "name"] == "DVHVolumeUnits"), "value"])
+#					switch(vol.units,
+#						CM3 = vol.type <- "absolute",
+#						PERCENT = vol.type <- "relative",
+#						vol.type <- "relative"
+#					)
+#					dvh.length <- as.numeric(dvh[which(dvh[, "name"] == "DVHNumberOfBins"), "value"])
+#					data <- as.numeric(unlist(strsplit(dvh[which(dvh[, "name"] == "DVHData"), "value"], " ")))
+#					vols <- data[1:dvh.length*2]
+#					scale <- as.numeric(dvh[which(dvh[, "name"] == "DVHDoseScaling"), "value"])
+#					doses <- cumsum(data[1:dvh.length*2-1]*scale)
+#					min <- dose.rx*as.numeric(dvh[which(dvh[, "name"] == "DVHMinimumDose"), "value"])/100
+#					mean <- dose.rx*as.numeric(dvh[which(dvh[, "name"] == "DVHMeanDose"), "value"])/100
+#					max <- dose.rx*as.numeric(dvh[which(dvh[, "name"] == "DVHMaximumDose"), "value"])/100
+#					return(new("DVH", patient=patient.name, ID=patient.ID, structure.name=ID, type=type, dose.units=dose.units, volume.type=vol.type, dose.type="absolute",doses=doses,volumes=vols,dose.min=min,dose.mean=mean,dose.max=max,dose.fx=N.fractions,dose.rx=dose.rx))
+#				}
+#			)
+#			DVH.list.names <- unlist(lapply(DVH.list, function(dvh) {return(dvh$structure.name)}))
+#			if (verbose) {
+#				cat("FINISHED\n")
+#			}		
+#		}
+#		else {
+#			DVH.list.names <- DVH.list <- NULL
+#		}
+	}
+	if (length(which(modalities == "RTDOSE")) < 1) {
+		warning("Unable to extract DVH data from DICOM-RT (no dose grid available)")
+		DVH <- FALSE
+	}
+
+##################################
+## IMPORT STRUCTURE SET FILE(S) ##
+##################################	
+
+	first <- TRUE
+	data.old <- data <- list(set=NULL, name=NULL, points=NULL, DVH=NULL)
+	use.dose.grid <- c()
+	for (i in as.numeric(which(modalities == "RTSTRUCT"))) {
+		if (verbose) {
+			cat("Reading structure set from file: '", filenames[i], "' ... ", sep="")
+		}
+		DICOMs$hdr[[i]] <- DICOM.i <- readDICOMFile(filenames[i], skipSequence=FALSE, pixelData=FALSE)$hdr
+			
+		structures <- DICOM.i[which(DICOM.i[,"name"] %in% c("ROIName", "ROINumber")),]
+		N <- dim(structures)[1]/2
+		frame.ref.CT.i <- as.character(DICOM.i[which(DICOM.i[,"name"] == "FrameOfReferenceUID"), "value"])
+		structureset.i.ID <- as.character(DICOM.i[which(DICOM.i[,"name"] == "SOPInstanceUID"), "value"])
+#		use.dose.grid <- c(use.dose.grid, !structureset.i.ID %in% structureset.ID)
+		use.dose.grid <- c(use.dose.grid, TRUE) ## CALCULATE DVH FROM DOSE GRID RATHER THAN USING EXISTENT DVHs IN DICOM DOSE FILE
+		if (length(frame.ref.CT.i) > 1) {
+			frame.ref.CT.i <- frame.ref.CT.i[which(frame.ref.CT.i != "")]
+			if (length(unique(frame.ref.CT.i)) > 1) {
+				if (verbose) {
+					warning("Ambiguous reference frame in structure set file")
+				}
+			}
+			frame.ref.CT.i <- frame.ref.CT[1]
+		}		
+		if (length(frame.ref.CT.i) < 1) {
+			frame.ref.CT.i <- frame.ref.CT
+			if (verbose) {
+				warning("No reference frame in structure set file")
+				if (is.na(frame.ref.CT)) {
+					cat("ERROR\n")
+					next
+				}
+			}
+		}
+		if (!is.na(frame.ref.CT) & (frame.ref.CT != frame.ref.CT.i)) {
+			if (verbose) {
+				warning("Reference frame mismatch")
+				cat("ERROR\n")
+			}			
+			next
+		}
+		structureset <- as.character(DICOM.i[which(DICOM.i[,"name"] == "StructureSetName"), "value"])
+		if (length(structureset) == 0) {
+			structureset <- as.character(DICOM.i[which(DICOM.i[,"name"] == "StructureSetLabel"), "value"])
+		}
+		if (N < 1) {
+			if (verbose) {
+				warning("Empty structure set")
+				cat("ERROR\n")
+			}			
+			next
+		}
+		if (verbose) {
+			cat("(", N, " structures identified) ", sep="")
+		}
+		structure.IDs <- as.numeric(structures[1:N*2-1, "value"])
+		names(structure.IDs) <- structures[1:N*2, "value"]
+		colors <- as.numeric(which(DICOM.i[,"name"] %in% c("ROIDisplayColor")))
+		col <- c()
+		structures <- as.numeric(which(DICOM.i[,"name"] == "ReferencedROINumber"))
+		contour.seq <- as.numeric(which(DICOM.i[,"name"] == "ContourSequence"))
+		contours <- as.numeric(which(DICOM.i[,"name"] == "ContourData"))
+		if (length(contour.seq) < 1) {
+			warning(paste("Structure set from file '", filenames[i], "' is empty", sep=""))
+			if (verbose) {
+				cat("ERROR\n")
+			}			
+			next			
+		}
+		if (!first) {
+			data.old$set <- c(data.old$set, data$set)
+			data.old$name <- c(data.old$name, list(data$name))
+			data.old$points <- c(data.old$points, list(data$points))
+			if (DVH) {
+				data.old$DVH <- c(data.old$DVH, list(data$DVH))
+			}
+		}
+		else {
+			data.old <- list(set=NULL, name=NULL, points=NULL, DVH=NULL)
+			first <- FALSE
+		}
+		data <- list(set=structureset, name=names(structure.IDs), points=vector("list", N), DVH=vector("list", N))
+		N.ROIs <- length(structures)
+		used <- c()
+		for (j in 1:length(contour.seq)) {
+			structures.j <- structures[which(structures > contour.seq[j])]
+			structure.j <- structures.j[which.min(structures.j)]
+			if (length(structure.j) < 1) {
+				warning(paste("Structure formatting error in DICOM file", sep=""))
+				next
+			}
+			data.j <- strsplit(DICOM.i[intersect(contour.seq[j]:structure.j, contours), "value"], " ")
+			struct.ID.j <- which(structure.IDs == as.numeric(DICOM.i[structure.j, "value"]))
+#			if (DVH) {
+#				DVH.j <- which(DVH.list.names == as.numeric(DICOM.i[structure.j, "value"]))
+#			}
+			if (length(struct.ID.j) < 1) {
+				warning(paste("Expected structure not matched in DICOM file", sep=""))
+				next
+			}
+			used <- c(used, struct.ID.j)
+			if (length(data.j) < 1) {
+				warning(paste("Structure '", names(structure.IDs)[struct.ID.j], "' is empty", sep=""))
+				data$points[[struct.ID.j]] <- NA
+				if (DVH) {
+#					if (length(DVH.j) < 1) {
+						data$DVH[[struct.ID.j]] <- new("DVH", patient=patient.name, ID=patient.ID, structure.name=names(structure.IDs)[struct.ID.j])
+#					}
+#					else {
+#						DVH.j <- DVH.list[[DVH.j]]
+#						DVH.j$structure.name <- names(structure.IDs)[struct.ID.j]
+#						data$DVH[[struct.ID.j]] <- DVH.j
+#					}
+					next
+				}
+			}
+			data.j <- lapply(data.j,
+				function(x) {
+					x <- as.numeric(x)
+					if (length(x) < 3) {
+						warning(paste("Structure '", names(structure.IDs)[struct.ID.j], "' is missing slices", sep=""))
+						return(NA)
+					}
+					x <- cbind(x[1:(length(x)/3)*3-2], x[1:(length(x)/3)*3-1], x[1:(length(x)/3)*3])
+					if (!is.null(CT)) {
+						x[,2] <- sum(range(as.numeric(dimnames(CT)[[2]]))) - x[,2]
+					}
+					return(x)
+				}
+			)			
+			data$points[[struct.ID.j]] <- data.j
+			if (DVH) {
+#				if (length(DVH.j) < 1) {
+					data$DVH[[struct.ID.j]] <- new("DVH", patient=patient.name, ID=patient.ID, structure.name=names(structure.IDs)[struct.ID.j])
+#				}
+#				else {
+#					DVH.j <- DVH.list[[DVH.j]]
+#					DVH.j$structure.name <- names(structure.IDs)[struct.ID.j]
+#					data$DVH[[struct.ID.j]] <- DVH.j
+#				}
+			}
+		}
+		if (length(setdiff(1:N, used)) > 0) {
+			warning(paste("Structure(s) ", paste("'", names(structure.IDs)[setdiff(1:N, used)], "'", collapse=", ", sep=""), " are empty", sep=""))
+			for (k in setdiff(1:N, used)) {
+				data$points[[k]] <- NA
+				if (DVH) {
+					data$DVH[[k]] <- new("DVH", patient=patient.name, ID=patient.ID, structure.name=names(structure.IDs)[k])
+				}
+			}
+		}
+		if (verbose) {
+			cat("FINISHED\n")
+		}
+	}
+	data$set <- c(data.old$set, data$set)
+	data$name <- c(data.old$name, list(data$name))
+	data$points <- c(data.old$points, list(data$points))
+	if (DVH) {
+		data$DVH <- c(data.old$DVH, list(data$DVH))
+	}
+
+	if (length(unlist(data$name)) >= 1) {
+		if (verbose) {
+			cat("Processing (", length(unlist(data$name)), ") structures:\n", sep="")
+		}		
+	}
+	else {
+		warning("No structure set(s) available for import")
+		if (length(doses) > 0) {
+			return(new("RTdata", name=path, CT=CT, dose=doses[[1]]))
+		}
+		else {
+			return(new("RTdata", name=path, CT=CT))
+		}
+	}
+	N <- length(data$name)
+	struct.list <- new("structure.list")
+	if (is.null(limit)) {
+		limit <- Inf
+	}
+	for (i in 1:N) {
+		for (j in 1:length(data$name[[i]])) {
+			struct.i <- data$points[[i]][[j]]
+			if (length(struct.i) < 1) {
+				struct.list <- c(struct.list, new("structure3D", name=paste(data$name[[i]][j], data$set[[i]])))
+				next
+			}
+			else if (length(unlist(struct.i, recursive=FALSE)) > limit) {
+				if (verbose) {
+					cat("  ", data$set[[i]], ": ", data$name[[i]][j], " [", length(struct.i), " axial slice(s), ", length(unlist(struct.i, recursive=FALSE))/3, " point(s)] ... skipped\n", sep="")
+				}
+				if (DVH) {
+					struct.list <- c(struct.list, new("structure3D", name=paste(data$name[[i]][j], data$set[[i]]), DVH=data$DVH[[i]][[j]]))
+				}
+				else {
+					struct.list <- c(struct.list, new("structure3D", name=paste(data$name[[i]][j], data$set[[i]])))
+				}
+				next
+			}
+			else if (length(unlist(struct.i, recursive=FALSE)) > 1) {
+				if (verbose) {
+					cat("  ", data$set[[i]], ": ", data$name[[i]][j], " [", length(struct.i), " axial slice(s), ", length(unlist(struct.i, recursive=FALSE)), " point(s)] ... ", sep="")
+				}
+				if (identical(struct.i, NA)) {
+					pts.i <- matrix(nrow=0, ncol=3)
+				}
+				else if (is.null(dim(struct.i))) {
+					pts.i <- matrix(NA, nrow=0, ncol=3)
+					for (k in 1:length(struct.i)) {
+						pts.i <- rbind(pts.i, struct.i[[k]])
+					}
+				}						
+				struct.i <- new("structure3D", name=paste(data$name[[i]][j], data$set[[i]]), vertices=pts.i, closed.polys=struct.i)
+				if (DVH & use.dose.grid[i]) {
+					if (zDVH) {
+						if (verbose) {
+							cat("calculating zDVH from dose grid ... ")
+						}
+						dvh.i <- calculate.DVH(struct.i, doses[[1]], resolution.xyz=c(pmin(voxel.size[1:2]/4, pixel.size/8, apply(range(struct.i),2,diff)[1:2]/100, na.rm=TRUE), voxel.size[3]), method="axial", dose.units=dose.units)
+					}
+					else {
+						if (verbose) {
+							cat("calculating DVH from dose grid ... ")
+						}
+						dvh.i <- calculate.DVH(struct.i, doses[[1]], resolution.xyz=c(pmin(voxel.size[1:2]/4, pixel.size/8, apply(range(struct.i),2,diff)[1:2]/100, na.rm=TRUE), voxel.size[3]), method="ATC", dose.units=dose.units)
+					}
+					if (is.null(dvh.i)) {
+						warning(paste("Unable to calculate DVH for structure '", data$name[[i]][j], "_", data$set[[i]], "'", sep=""))
+						if (verbose) {
+							cat("ERROR\n")
+						}			
+						struct.list <- c(struct.list, struct.i)
+						next						
+					}
+					struct.i$DVH <- dvh.i
+					struct.i$DVH$dose.rx <- as.numeric(dose.rx)
+					struct.i$DVH$dose.fx <- N.fractions
+				}
+				else if (DVH) {
+					struct.i$DVH <- data$DVH[[i]][[j]]
+				}
+				struct.list <- c(struct.list, struct.i)
+				if (verbose) {
+					cat("FINISHED\n")
+				}
+			}
+			else if ((length(unlist(struct.i, recursive=FALSE)) == 1) & (!is.na(struct.i))) {
+				if (verbose) {
+					cat("  ", data$set[[i]], ": ", data$name[[i]][j], " [", length(struct.i), " axial slice(s), ", length(unlist(struct.i, recursive=FALSE))/3, " point(s)] ... ", sep="")
+				}
+				if (identical(struct.i, NA)) {
+					pts.i <- matrix(nrow=0, ncol=3)
+				}
+				else if (is.null(dim(struct.i))) {
+					pts.i <- matrix(NA, nrow=0, ncol=3)
+					for (k in 1:length(struct.i)) {
+						pts.i <- rbind(pts.i, struct.i[[k]])
+					}
+				}					
+				struct.i <- new("structure3D", name=paste(data$name[[i]][j], data$set[[i]]), vertices=pts.i, closed.polys=struct.i)
+				if (DVH & use.dose.grid[i]) {
+					if (zDVH) {
+						if (verbose) {
+							cat("calculating zDVH from dose grid ... ")
+						}
+						dvh.i <- calculate.DVH(struct.i, doses[[1]], resolution.xyz=c(pmin(voxel.size[1:2]/4, pixel.size/8, apply(range(struct.i),2,diff)[1:2]/100, na.rm=TRUE), voxel.size[3]), method="axial", dose.units=dose.units)
+					}
+					else {
+						if (verbose) {
+							cat("calculating DVH from dose grid ... ")
+						}
+						dvh.i <- calculate.DVH(struct.i, doses[[1]], resolution.xyz=c(pmin(voxel.size[1:2]/4, pixel.size/8, apply(range(struct.i),2,diff)[1:2]/100, na.rm=TRUE), voxel.size[3]), method="ATC", dose.units=dose.units)
+					}	
+					if (is.null(dvh.i)) {
+						warning(paste("Unable to calculate DVH for structure '", data$name[[i]][j], "_", data$set[[i]], "'", sep=""))
+						if (verbose) {
+							cat("ERROR\n")
+						}			
+						struct.list <- c(struct.list, struct.i)
+						next						
+					}
+					struct.i$DVH <- dvh.i
+					struct.i$DVH$dose.rx <- as.numeric(dose.rx)
+					struct.i$DVH$dose.fx <- N.fractions
+				}
+				else if (DVH) {
+					struct.i$DVH <- data$DVH[[i]][[j]]
+				}
+				struct.list <- c(struct.list, struct.i)
+				if (verbose) {
+					cat("FINISHED\n")
+				}
+			}
+			else {
+				if (verbose) {
+					cat("  ", data$set[[i]], ": ", data$name[[i]][j], " [EMPTY] ... FINISHED\n", sep="")
+				}
+				if (DVH) {
+					struct.list <- c(struct.list, new("structure3D", name=paste(data$name[[i]][j], data$set[[i]]), DVH=data$DVH[[i]][[j]]))				
+				}
+				else {
+					struct.list <- c(struct.list, new("structure3D", name=paste(data$name[[i]][j], data$set[[i]])))				
+				}
+			}
+		}
+	}
+
+	if (length(doses) > 0) {
+		return(new("RTdata", name=path, CT=CT, dose=doses[[1]], structures=struct.list))
+	}
+	else {
+		return(new("RTdata", name=path, CT=CT, structures=struct.list))		
+	}
+	## FOR OTHER FILES LOAD SPECIFIC DICOM files with skipSequence=FALSE and re-store hdr info in DICOM list!
+
+}
+
+#line 1 "/Users/thompsre/RadOnc/R/read.DVH.R"
+read.DVH <- function (file, type=NA, verbose=TRUE, collapse=TRUE, modality=NULL) {
+	types <- c("aria10", "aria11", "aria13", "aria15", "dicom", "cadplan", "tomo", "monaco", "raystation", "aria8")
+	type <- match.arg(tolower(type), choices=c(NA, types), several.ok=TRUE)
+	modality <- match.arg(modality, choices=c("CT", "MR"))
+	if (length(file) < 1) {
+		warning("argument 'file' is missing, with no default")
+		return()
+	}
+	
+	read.DVH.file <- function (file, type, verbose=TRUE) {
+		switch(type, 
+			aria10 = return(read.DVH.Aria10(file=file, verbose=verbose)),
+			aria8 = return(read.DVH.Aria8(file=file, verbose=verbose)),
+			aria11 = return(read.DVH.Aria11(file=file, verbose=verbose)),
+			aria13 = return(read.DVH.Aria13(file=file, verbose=verbose)),
+			aria15 = return(read.DVH.Aria15(file=file, verbose=verbose)),
+			dicom = return(read.DVH.DICOM(path=file, verbose=verbose, modality=modality)),
+			cadplan = return(read.DVH.CadPlan(file=file, verbose=verbose)),
+			tomo = return(read.DVH.TomoTherapy(file=file, verbose=verbose)),
+			monaco = return(read.DVH.Monaco(file=file, verbose=verbose)),
+			raystation = return(read.DVH.RayStation(file=file, verbose=verbose)),
+			{
+				warning("DVH file format not specified for file '", file, "'")
+				if (verbose) {
+					cat("Attempting to read DVH file ('", file, "')... ", sep="")
+				}
+				i <- 1
+				repeat {
+					if (i > length(types)) { break }
+					DVH <- try(read.DVH.file(file, types[i], verbose=FALSE), silent=TRUE)
+					if (!is.null(DVH) && (!inherits(DVH, "try-error"))) { return(DVH) }
+					i <- i+1
+				}
+				if (verbose) {
+					cat("ERROR\n")
+				}
+			}
+		)
+		return()
+	}		
+
+	
+	if (length(file) == 1) {
+		if (length(type) > 1) {
+			warning("length of 'file' and 'type' do not match")
+			type <- type[1]
+		}
+		return(read.DVH.file(file, type, verbose))
+	}
+	if (length(type) < length(file)) {
+		if (length(type) > 1) {
+			warning("length of 'file' and 'type' do not match")
+		}
+		type <- rep(type[1], length(file))
+	}
+	else if (length(type) > length(file)) {
+		warning("length of 'file' and 'type' do not match")
+		type <- type[1:length(file)]	
+	}
+	DVH.list <- mapply(function(x, y, z) {list(read.DVH.file(x, y, z))}, file, type, verbose)
+    names(DVH.list) <- sapply(DVH.list, function(x) {if (is.null(x)) {return("")} else {paste(x[[1]]@ID, x[[1]]@patient, sep="_")}})
+    if (collapse) {
+		return(as(DVH.list, "DVH.list"))    	
+    }
+    else {
+		return(DVH.list)
+    }
+}
+
+
+read.DVH.Aria10 <- function (file, verbose=TRUE) {
+	if (!(fid <- file(file, open="r"))) {
+		warning(paste("Could not open file '", file, "'", sep=""))		
+		return()
+	}
+	if (verbose) {
+		cat("Reading DVH file ('", file, "')... ", sep="")
+	}
+	data <- readLines(fid)
+	close(fid)
+	
+    ## IDENTIFY STRUCTURES
+    struct.start <- grep("^Structure: ", data, perl=TRUE)
+    struct.end <- struct.start + diff(c(struct.start, length(data)+1)) - 1
+    if (length(struct.start) < 1) {
+		warning(paste("File '", file, "' contained no recognizable DVH structure(s)", sep=""))
+		if (verbose) {
+			cat("ERROR\n")
+		}
+		return()
+    }
+    else if (length(struct.start) == 1) {
+   	 	structures <- list(data[struct.start:struct.end])
+    }
+    else {
+	    structures <- mapply(function(start, end) list(data[start:end]), struct.start, struct.end)
+	}
+	# EXTRACT HEADER INFO
+    header <- data[1:(struct.start[1]-1)]
+    patient <- sub("^.*: (.*?)\\s*([(].*[)]|$).*", "\\1", header[grep("^Patient Name.*: ", header, ignore.case=TRUE, perl=TRUE)], perl=TRUE)
+    ID <- sub("^.*: (.+$)", "\\1", header[grep("^Patient ID.*: ", header, ignore.case=TRUE, perl=TRUE)])
+    plan.sum <- (grepl("Summed", header[grep("^Comment.*: ", header, ignore.case=TRUE, perl=TRUE)]))
+    date <- sub("^.*: (.+$)", "\\1", header[grep("^Date.*: ", header, ignore.case=TRUE, perl=TRUE)])
+	plan <- sub("^.*: (.+$)", "\\1", header[grep("^Plan.*: ", header, ignore.case=TRUE, perl=TRUE)])
+	DVH.type <- header[grep("^Type.*: ", header, ignore.case=TRUE, perl=TRUE)]
+	if (grepl("Cumulative", DVH.type, ignore.case=TRUE, perl=TRUE)) {
+		DVH.type <- "cumulative"
+	}
+	else {
+		DVH.type <- "differential"
+	}
+	# EXTRACT PRESCRIPTION DOSE AND DOSE UNITS
+	dose.rx <- header[grep("^Prescribed dose.*: ", header, ignore.case=TRUE, perl=TRUE)]
+    dose.units <- toupper(sub("^.*[[](.*)[]].*", "\\1", dose.rx, perl=TRUE))
+
+	if (dose.units == "GY") {
+		dose.units <- "Gy"
+	}
+	else if (dose.units == "CGY") {
+		dose.units <- "cGy"
+	}
+	dose.rx <- suppressWarnings(as.numeric(sub("^Prescribed dose.*: ", "", dose.rx, ignore.case=TRUE, perl=TRUE)))
+    rx.isodose <- suppressWarnings(as.numeric(sub(".*: ", "", header[grep("^[%] for dose.*: ", header, ignore.case=TRUE, perl=TRUE)])))
+    
+	if (verbose) {
+		cat("[exported on ", date, "]\n", sep="")
+		cat("  Patient: ", patient, " (", ID, ")\n", sep="")
+		cat("  Plan: ", plan, "\n  Dose: ", if (is.na(dose.rx)) {"NOT SPECIFIED"} else {paste(dose.rx, dose.units, " (at ", rx.isodose, "% isodose line)", sep="")}, "\n", sep="")		
+	}
+
+	# EXTRACT DVH DATA FOR EACH STRUCTURE
+	DVH.list <- lapply(structures,
+		function (data) {
+		    name <- sub("^.*: (.+$)", "\\1", data[grep("^Structure.*: ", data, ignore.case=TRUE, perl=TRUE)])
+		    if (length(name) < 1) {
+				warning("Invalid DVH file format, could not extract structure")
+				return(new("DVH"))
+		    }
+		    volume <- suppressWarnings(as.numeric(sub("^.*: (.+$)", "\\1", data[grep("^Volume.*: ", data, ignore.case=TRUE, perl=TRUE)], perl=TRUE)))
+		    if (length(volume) < 1) {
+				warning("Invalid DVH file format, could not extract structure volume information")
+				return(new("DVH"))
+		    }
+        	header <- grep("Dose [[](%|Gy|cGy)[]].*Volume", data, ignore.case=TRUE, perl=TRUE)
+			if (grepl("^\\s*Dose [[](cGy|Gy)[]].*Volume", data[header], ignore.case=TRUE, perl=TRUE)) {
+				dose.type <- "absolute"
+			}
+			else {
+				dose.type <- "relative"
+			}
+			if (grepl(".*Volume [[][%][]]", data[header], ignore.case=TRUE, perl=TRUE)) {
+				volume.type <- "relative"
+			}
+			else {
+				volume.type <- "absolute"
+			}
+			getDose <- function(dose) {
+				if (grepl("[[]%[]]", dose)) {
+					if (dose.type == "absolute") {
+						dose <- suppressWarnings(as.numeric(sub(".*: ", "", dose)))*dose.rx/rx.isodose		
+					}
+					else {
+						dose <- suppressWarnings(as.numeric(sub(".*: ", "", dose)))
+					}
+				}
+				else {
+					if (dose.type == "absolute") {
+						dose <- suppressWarnings(as.numeric(sub(".*: ", "", dose)))
+					}
+					else {
+						dose <- suppressWarnings(as.numeric(sub(".*: ", "", dose)))*rx.isodose/dose.rx		
+					}
+				}
+				return(dose)				
+			}
+
+			dose.min <- getDose(data[grep("^Min Dose.*: ", data, ignore.case=TRUE, perl=TRUE)])
+			dose.max <- getDose(data[grep("^Max Dose.*: ", data, ignore.case=TRUE, perl=TRUE)])
+			dose.mean <- max(0, getDose(data[grep("^Mean Dose.*: ", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
+			if (verbose) {
+				cat("  ..Importing structure: ", name, "  [volume: ", volume, "cc, dose: ", dose.min, " - ", dose.max, dose.units, "]\n", sep="")
+			}
+
+			dose.mode <- max(0, getDose(data[grep("^Modal Dose.*: ", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
+			dose.median <- max(0, getDose(data[grep("^Median Dose.*: ", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
+			dose.STD <- max(0, getDose(data[grep("^STD.*: ", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
+
+		    equiv.sphere <- suppressWarnings(as.numeric(sub("^.*: (.+$)", "\\1", data[grep("^Equiv. Sphere Diam.*: ", data, ignore.case=TRUE, perl=TRUE)])))
+		    conf.ind <- suppressWarnings(as.numeric(sub("^.*: (.+$)", "\\1", data[grep("^Conformity Index.*: ", data, ignore.case=TRUE, perl=TRUE)])))
+		    gradient <- suppressWarnings(as.numeric(sub("^.*: (.+$)", "\\1", data[grep("^Gradient Measure.*: ", data, ignore.case=TRUE, perl=TRUE)])))
+
+			con <- textConnection(data[(header+1):length(data)])
+			dvh <- read.table(con, header=FALSE, stringsAsFactors=FALSE)
+			close(con)
+			data.dose <- dvh[, 1]
+			if (plan.sum) {
+				data <- dvh[, 2]
+			}
+			else {
+				data <- dvh[, 3]
+			}
+			if (DVH.type == "differential") {
+				data <- data * diff(c(-data.dose[1], data.dose))
+				temp.doses <- data.dose - diff(c(-data.dose[1], data.dose))/2
+				data.dose <- c(temp.doses, (2*data.dose - temp.doses)[length(temp.doses)])
+				data <- diffinv(-data, xi=sum(data))
+			}
+			return(new("DVH", patient=patient, ID=ID, dose.min=dose.min, dose.max=dose.max, dose.mean=dose.mean, dose.mode=dose.mode, dose.median=dose.median, dose.STD=dose.STD, equiv.sphere=equiv.sphere, conf.index=conf.ind, gradient=gradient, plan.sum=plan.sum, dose.rx=dose.rx, rx.isodose=rx.isodose, structure.name=name, structure.volume=volume, doses=data.dose, volumes=data, type="cumulative", dose.type=dose.type, dose.units=dose.units, volume.type=volume.type))	
+		}
+	)
+	
+	# RETURN DVH LIST
+	names(DVH.list) <- unlist(lapply(DVH.list, names))
+	return(new("DVH.list", DVH.list))
+}
+
+read.DVH.Aria13 <- function (file, verbose=TRUE) {
+	if (!(fid <- file(file, open="r"))) {
+		warning(paste("Could not open file '", file, "'", sep=""))		
+		return()
+	}
+	if (verbose) {
+		cat("Reading DVH file ('", file, "')... ", sep="")
+	}
+	data <- readLines(fid)
+	close(fid)
+	
+    ## IDENTIFY STRUCTURES
+    struct.start <- grep("^Structure: ", data, perl=TRUE)
+    struct.end <- struct.start + diff(c(struct.start, length(data)+1)) - 1
+    if (length(struct.start) < 1) {
+		warning(paste("File '", file, "' contained no recognizable DVH structure(s)", sep=""))
+		if (verbose) {
+			cat("ERROR\n")
+		}
+		return()
+    }
+    else if (length(struct.start) == 1) {
+   	 	structures <- list(data[struct.start:struct.end])
+    }
+    else {
+	    structures <- mapply(function(start, end) list(data[start:end]), struct.start, struct.end)
+	}
+	# EXTRACT HEADER INFO
+    header <- data[1:(struct.start[1]-1)]
+    patient <- sub("^.*: (.*?)\\s*([(].*[)]|$).*", "\\1", header[grep("^Patient Name.*: ", header, ignore.case=TRUE, perl=TRUE)], perl=TRUE)
+    ID <- sub("^.*: (.+$)", "\\1", header[grep("^Patient ID.*: ", header, ignore.case=TRUE, perl=TRUE)])
+    plan.sum <- (grepl("plan sum", header[grep("^Comment.*: ", header, ignore.case=TRUE, perl=TRUE)]))
+    date <- sub("^.*: (.+$)", "\\1", header[grep("^Date.*: ", header, ignore.case=TRUE, perl=TRUE)])
+	plan <- sub("^.*: (.+$)", "\\1", header[grep("^Plan.*: ", header, ignore.case=TRUE, perl=TRUE)])
+	DVH.type <- header[grep("^Type.*: ", header, ignore.case=TRUE, perl=TRUE)]
+	if (grepl("Cumulative", DVH.type, ignore.case=TRUE, perl=TRUE)) {
+		DVH.type <- "cumulative"
+	}
+	else {
+		DVH.type <- "differential"
+	}
+	# EXTRACT PRESCRIPTION DOSE AND DOSE UNITS
+	dose.rx <- header[grep("^(Prescribed|Total) dose.*: ", header, ignore.case=TRUE, perl=TRUE)]
+    dose.units <- toupper(sub("^.*[[](.*)[]].*", "\\1", dose.rx, perl=TRUE))
+
+	if (dose.units == "GY") {
+		dose.units <- "Gy"
+	}
+	else if (dose.units == "CGY") {
+		dose.units <- "cGy"
+	}
+	dose.rx <- suppressWarnings(as.numeric(sub("^(Prescribed|Total) dose.*: ", "", dose.rx, ignore.case=TRUE, perl=TRUE)))
+    rx.isodose <- suppressWarnings(as.numeric(sub(".*: ", "", header[grep("^[%] for dose.*: ", header, ignore.case=TRUE, perl=TRUE)])))
+    
+	if (verbose) {
+		cat("[exported on ", date, "]\n", sep="")
+		cat("  Patient: ", patient, " (", ID, ")\n", sep="")
+		cat("  Plan: ", plan, "\n  Dose: ", if (is.na(dose.rx)) {"NOT SPECIFIED"} else {paste(dose.rx, dose.units, " (at ", rx.isodose, "% isodose line)", sep="")}, "\n", sep="")		
+	}
+
+	# EXTRACT DVH DATA FOR EACH STRUCTURE
+	DVH.list <- lapply(structures,
+		function (data) {
+		    name <- sub("^.*: (.+$)", "\\1", data[grep("^Structure.*: ", data, ignore.case=TRUE, perl=TRUE)])
+		    if (length(name) < 1) {
+				warning("Invalid DVH file format, could not extract structure")
+				return(new("DVH"))
+		    }
+		    volume <- suppressWarnings(as.numeric(sub("^.*: (.+$)", "\\1", data[grep("^Volume.*: ", data, ignore.case=TRUE, perl=TRUE)], perl=TRUE)))
+		    if (length(volume) < 1) {
+				warning("Invalid DVH file format, could not extract structure volume information")
+				return(new("DVH"))
+		    }
+        	header <- grep("Dose [[](%|Gy|cGy)[]].*Volume", data, ignore.case=TRUE, perl=TRUE)
+			if (grepl("^\\s*Dose [[](cGy|Gy)[]].*Volume", data[header], ignore.case=TRUE, perl=TRUE)) {
+				dose.type <- "absolute"
+			}
+			else {
+				dose.type <- "relative"
+			}
+			if (grepl(".*Volume [[][%][]]", data[header], ignore.case=TRUE, perl=TRUE)) {
+				volume.type <- "relative"
+			}
+			else {
+				volume.type <- "absolute"
+			}
+			getDose <- function(dose) {
+				if (grepl("[[]%[]]", dose)) {
+					if (dose.type == "absolute") {
+						dose <- suppressWarnings(as.numeric(sub(".*: ", "", dose)))*dose.rx/rx.isodose		
+					}
+					else {
+						dose <- suppressWarnings(as.numeric(sub(".*: ", "", dose)))
+					}
+				}
+				else {
+					if (dose.type == "absolute") {
+						dose <- suppressWarnings(as.numeric(sub(".*: ", "", dose)))
+					}
+					else {
+						dose <- suppressWarnings(as.numeric(sub(".*: ", "", dose)))*rx.isodose/dose.rx		
+					}
+				}
+				return(dose)				
+			}
+
+			dose.min <- getDose(data[grep("^Min Dose.*: ", data, ignore.case=TRUE, perl=TRUE)])
+			dose.max <- getDose(data[grep("^Max Dose.*: ", data, ignore.case=TRUE, perl=TRUE)])
+			dose.mean <- max(0, getDose(data[grep("^Mean Dose.*: ", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
+			if (verbose) {
+				if(dose.type == "absolute") {
+					cat("  ..Importing structure: ", name, "  [volume: ", volume, "cc, dose: ", dose.min, " - ", dose.max, dose.units, "]\n", sep="")
+				}
+				else {
+					cat("  ..Importing structure: ", name, "  [volume: ", volume, "cc, dose: ", dose.min, " - ", dose.max, "%]\n", sep="")
+				}
+			}
+
+			dose.mode <- max(0, getDose(data[grep("^Modal Dose.*: ", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
+			dose.median <- max(0, getDose(data[grep("^Median Dose.*: ", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
+			dose.STD <- max(0, getDose(data[grep("^STD.*: ", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
+
+		    equiv.sphere <- suppressWarnings(as.numeric(sub("^.*: (.+$)", "\\1", data[grep("^Equiv. Sphere Diam.*: ", data, ignore.case=TRUE, perl=TRUE)])))
+		    conf.ind <- suppressWarnings(as.numeric(sub("^.*: (.+$)", "\\1", data[grep("^Conformity Index.*: ", data, ignore.case=TRUE, perl=TRUE)])))
+		    gradient <- suppressWarnings(as.numeric(sub("^.*: (.+$)", "\\1", data[grep("^Gradient Measure.*: ", data, ignore.case=TRUE, perl=TRUE)])))
+
+			con <- textConnection(data[(header+1):length(data)])
+			dvh <- read.table(con, header=FALSE, stringsAsFactors=FALSE)
+			close(con)
+			data.dose <- dvh[, 1]
+			if (plan.sum) {
+				data <- dvh[, 2]
+			}
+			else {
+				data <- dvh[, 3]
+			}
+			if (DVH.type == "differential") {
+				data <- data * diff(c(-data.dose[1], data.dose))
+				temp.doses <- data.dose - diff(c(-data.dose[1], data.dose))/2
+				data.dose <- c(temp.doses, (2*data.dose - temp.doses)[length(temp.doses)])
+				data <- diffinv(-data, xi=sum(data))
+			}
+			return(new("DVH", patient=patient, ID=ID, dose.min=dose.min, dose.max=dose.max, dose.mean=dose.mean, dose.mode=dose.mode, dose.median=dose.median, dose.STD=dose.STD, equiv.sphere=equiv.sphere, conf.index=conf.ind, gradient=gradient, plan.sum=plan.sum, dose.rx=dose.rx, rx.isodose=rx.isodose, structure.name=name, structure.volume=volume, doses=data.dose, volumes=data, type="cumulative", dose.type=dose.type, dose.units=dose.units, volume.type=volume.type))	
+		}
+	)
+	
+	# RETURN DVH LIST
+	names(DVH.list) <- unlist(lapply(DVH.list, names))
+	return(new("DVH.list", DVH.list))	
+}
+
+read.DVH.Aria15 <- function (file, verbose=TRUE) {
+	return(read.DVH.Aria13(file, verbose))
+}
+
+
+read.DVH.Aria11 <- function (file, verbose=TRUE) {
+	return(read.DVH.Aria10(file, verbose))
+}
+
+
+read.DVH.Aria8 <- function (file, verbose=TRUE) {
+	warning("Aria 8 format not currently supported")
+	return()
+}
+
+read.DVH.DICOM <- function(path, verbose=TRUE, modality) {
+	dicom <- read.DICOM.RT(path, verbose=verbose, DVH=TRUE, modality=modality)
+	if (is.null(dicom)) return()
+	return(as(dicom$structures, "DVH.list"))
+}
+
+read.DVH.CadPlan <- function(file, verbose=TRUE) {
+	if (!(fid <- file(file, open="r"))) {
+		warning(paste("Could not open file '", file, "'", sep=""))		
+		return()
+	}
+	if (verbose) {
+		cat("Reading DVH file ('", file, "')... ", sep="")
+	}
+	data <- readLines(fid)
+	close(fid)
+	
+    ## IDENTIFY STRUCTURES
+    struct.start <- grep("^Histogram.*:\\s*", data, perl=TRUE)
+    struct.end <- struct.start + diff(c(struct.start, length(data)+1)) - 1
+    if (length(struct.start) < 1) {
+		warning(paste("File '", file, "' contained no recognizable DVH structure(s)", sep=""))
+		if (verbose) {
+			cat("ERROR\n")
+		}
+		return()
+    }
+    else if (length(struct.start) == 1) {
+    	structures <- list(data[struct.start:struct.end])
+    }
+    else {
+	    structures <- mapply(function(start, end) list(data[start:end]), struct.start, struct.end)
+	}
+	# EXTRACT HEADER INFO
+    header <- data[1:(struct.start[1]-1)]
+    patient <- sub("^.*: (.*)", "\\1", header[grep("^Patient Name.*:\\s*", header, ignore.case=TRUE, perl=TRUE)], perl=TRUE)
+    ID <- sub("^.*: (.+$)", "\\1", header[grep("^Patient ID.*:\\s*", header, ignore.case=TRUE, perl=TRUE)])
+    date <- sub("^.*: (.+$)", "\\1", header[grep("^Date.*:\\s*", header, ignore.case=TRUE, perl=TRUE)])
+	plan <- sub("^PLAN\\s*(.+$)", "\\1", header[grep("^PLAN\\s+", header, ignore.case=TRUE, perl=TRUE)])
+	DVH.type <- header[grep("Dose Volume Histogram", header, ignore.case=TRUE, perl=TRUE)]
+	if (grepl("Cumulative", DVH.type, ignore.case=TRUE, perl=TRUE)) {
+		DVH.type <- "cumulative"
+	}
+	else {
+		DVH.type <- "differential"
+	}
+
+	if (verbose) {
+		cat("[exported on ", date, "]\n", sep="")
+		cat("  Patient: ", patient, " (", ID, ")\n", sep="")
+		cat("  Plan: ", plan, "\n", sep="")		
+	}
+	
+	# EXTRACT DVH DATA FOR EACH STRUCTURE
+	DVH.list <- lapply(structures,
+		function (data) {
+			# EXTRACT PRESCRIPTION DOSE AND DOSE UNITS
+			dose.rx <- data[grep("^Prescr[.] dose.*:\\s*", data, ignore.case=TRUE, perl=TRUE)]
+			rx.isodose <- data[grep("^[%] for dose.*:\\s*", data, ignore.case=TRUE, perl=TRUE)]
+
+    		dose.units <- toupper(sub("^.*[(](.*)[)].*", "\\1", dose.rx, perl=TRUE))
+			if (dose.units == "GY") {
+				dose.units <- "Gy"
+			}
+			else if (dose.units == "CGY") {
+				dose.units <- "cGy"
+			}
+			dose.rx <- suppressWarnings(as.numeric(sub("^Prescr[.] dose.*:\\s*", "", dose.rx, ignore.case=TRUE, perl=TRUE)))
+		    rx.isodose <- suppressWarnings(as.numeric(sub("^[%] for dose.*:\\s*", "", rx.isodose, ignore.case=TRUE)))
+			if (is.na(dose.rx)) {
+				warning("Prescription dose not specified")
+			}
+
+		    name <- sub("^.*:\\s*(.+$)", "\\1", data[grep("^Histogram.*:\\s*", data, ignore.case=TRUE, perl=TRUE)])
+		    if (length(name) < 1) {
+				warning("Invalid DVH file format, could not extract structure")
+				return(new("DVH"))
+		    }
+		    volume <- suppressWarnings(as.numeric(sub("^.*:\\s*(.+$)", "\\1", data[grep("^Volume.*:\\s*", data, ignore.case=TRUE, perl=TRUE)], perl=TRUE)))
+		    if (length(volume) < 1) {
+				warning("Invalid DVH file format, could not extract structure volume information")
+				return(new("DVH"))
+		    }
+        	header <- grep("Dose\\s*[(]\\s*(%|Gy|cGy)\\s*[)].*Volume", data, ignore.case=TRUE, perl=TRUE)
+			if (grepl("^\\s*Dose\\s*[(]\\s*(Gy|cGy)\\s*[)].*Volume", data[header], ignore.case=TRUE, perl=TRUE)) {
+				dose.type <- "absolute"
+			}
+			else {
+				dose.type <- "relative"
+			}
+			if (grepl(".*Volume\\s*[(]\\s*[%]\\s*[)]", data[header], ignore.case=TRUE, perl=TRUE)) {
+				volume.type <- "relative"
+			}
+			else {
+				volume.type <- "absolute"
+			}
+			getDose <- function(dose) {
+				if (grepl("[(]\\s*[%]\\s*[)]", dose)) {
+					if (dose.type == "absolute") {
+						dose <- suppressWarnings(as.numeric(sub(".*:\\s*", "", dose)))*dose.rx/rx.isodose	
+					}
+					else {
+						dose <- suppressWarnings(as.numeric(sub(".*:\\s*", "", dose)))
+					}
+				}
+				else {
+					if (dose.type == "absolute") {
+						dose <- suppressWarnings(as.numeric(sub(".*:\\s*", "", dose)))
+					}
+					else {
+						dose <- suppressWarnings(as.numeric(sub(".*:\\s*", "", dose)))*rx.isodose/dose.rx
+					}
+				}
+				return(dose)				
+			}
+
+			dose.min <- getDose(data[grep("^Dose minimum.*:\\s*", data, ignore.case=TRUE, perl=TRUE)])
+			dose.max <- getDose(data[grep("^Dose maximum.*:\\s*", data, ignore.case=TRUE, perl=TRUE)])
+			dose.mean <- max(0, getDose(data[grep("^Dose mean.*:\\s*", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
+			if (verbose) {
+				cat("  ..Importing structure: ", name, "  [volume: ", volume, "cc, dose: ", dose.min, " - ", dose.max, dose.units, "]\n", sep="")
+			}
+
+			dose.mode <- max(0, getDose(data[grep("^Dose modal.*:\\s*", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
+			dose.median <- max(0, getDose(data[grep("^Dose median.*:\\s*", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
+			dose.STD <- max(0, getDose(data[grep("^Standard dev.*:\\s*", data, ignore.case=TRUE, perl=TRUE)]), na.rm=TRUE)
+
+			con <- textConnection(data[(header+1):length(data)])
+			dvh <- read.table(con, header=FALSE, stringsAsFactors=FALSE)
+			close(con)
+			data.dose <- dvh[, 1]
+			data <- dvh[, 2]
+			if (DVH.type == "differential") {
+				data <- data * diff(c(-data.dose[1], data.dose))
+				temp.doses <- data.dose - diff(c(-data.dose[1], data.dose))/2
+				data.dose <- c(temp.doses, (2*data.dose - temp.doses)[length(temp.doses)])
+				data <- diffinv(-data, xi=sum(data))
+			}
+			return(new("DVH", dose.min=dose.min, dose.max=dose.max, dose.mean=dose.mean, dose.mode=dose.mode, dose.median=dose.median, dose.STD=dose.STD, dose.rx=dose.rx, rx.isodose=rx.isodose, structure.name=name, structure.volume=volume, doses=data.dose, volumes=data, type="cumulative", dose.type=dose.type, dose.units=dose.units, volume.type=volume.type))	
+		}
+	)
+	
+	# RETURN DVH LIST
+	names(DVH.list) <- unlist(lapply(DVH.list, names))
+	return(new("DVH.list", DVH.list))
+}
+
+
+read.DVH.TomoTherapy <- function (file, verbose=TRUE) {
+	if (!(fid <- file(file, open="r"))) {
+		warning(paste("Could not open file '", file, "'", sep=""))		
+		return()
+	}
+	if (verbose) {
+		cat("Reading DVH file ('", file, "')... \n", sep="")
+	}
+	close(fid)
+	data <- read.table(file, header=TRUE, sep=",", quote="\"")
+	dvh <- list()
+	for (i in 1:(dim(data)[2]/3)) {
+		name <- sub("(.*)[.]STANDARD[.](.*)", "\\1\\2", colnames(data)[i*3-2], ignore.case=FALSE, perl=TRUE)
+		dose.units <- toupper(sub("^Dose[.]*(c?Gy).*", "\\1", colnames(data)[i*3-1], ignore.case=TRUE, perl=TRUE))
+		if (dose.units == "GY") {
+			dose.units <- "Gy"
+		}
+		else if (dose.units == "CGY") {
+			dose.units <- "cGy"
+		}
+		if (grepl("^Relative[.]", colnames(data)[i*3], ignore.case=TRUE, perl=TRUE)) {
+			volume.type <- "relative"			
+		}
+		else {
+			volume.type <- "absolute"
+		}
+		if (verbose) {
+			cat("  ..Importing structure: ", name, "\n", sep="")
+		}
+		data.dose <- data[,i*3-1]
+		data.volume <- data[,i*3]
+		dvh <- c(dvh, new("DVH", structure.name=name, doses=data.dose, volumes=data.volume, dose.units=dose.units, volume.type=volume.type, type="cumulative"))
+	}
+	return(new("DVH.list", dvh))
+}
+
+
+read.DVH.Monaco <- function (file, verbose=TRUE) {
+	if (!(fid <- file(file, open="r"))) {
+		warning(paste("Could not open file '", file, "'", sep=""))		
+		return()
+	}
+	if (verbose) {
+		cat("Reading DVH file ('", file, "')... ", sep="")
+	}
+	header <- unlist(strsplit(readLines(fid, n=3),"[ ]*[|][ ]*", perl=TRUE))
+	data <- readLines(fid)
+	close(fid)
+    patient <- sub("^.*: (.*)[~].*", "\\1", header[grep("^Patient ID.*:\\s*", header, ignore.case=TRUE, perl=TRUE)])
+    ID <- sub("^.*: .*[~](.*)", "\\1", header[grep("^Patient ID.*:\\s*", header, ignore.case=TRUE, perl=TRUE)])
+    date <- data[length(data)]
+	plan <- sub("^Plan Name:\\s*(.+$)", "\\1", header[grep("^Plan Name.*:\\s*", header, ignore.case=TRUE, perl=TRUE)])
+	dose.units <- sub("^Dose Units:\\s*(.+$)", "\\1", header[grep("^Dose Units.*:\\s*", header, ignore.case=TRUE, perl=TRUE)])
+	if (dose.units == "%") {
+		dose.type <- "relative"
+		dose.units <- sub("^Bin Width:.*[(](.*)[)]", "\\1", header[grep("^Bin Width.*:", header, ignore.case=TRUE, perl=TRUE)])
+	}
+	else {
+		dose.type <- "absolute"
+	}
+	volume.units <- sub("^Volume Units:\\s*(.+$)", "\\1", header[grep("^Volume Units.*:\\s*", header, ignore.case=TRUE, perl=TRUE)])
+	if (volume.units == "%") {
+		volume.type <- "relative"
+	}
+	else {
+		volume.type <- "absolute"
+	}
+
+	if (verbose) {
+		cat("[exported on ", date, "]\n", sep="")
+		cat("  Patient: ", patient, " (", ID, ")\n", sep="")
+		cat("  Plan: ", plan, "\n", sep="")		
+	}
+	data <- strsplit(data[1:(length(data)-3)],"[ ]+")
+	data.structures <- unlist(lapply(data, function(x) {x[1]}))
+	data.dose <- as.numeric(unlist(lapply(data, function(x) {x[2]})))
+	data.volume <- as.numeric(unlist(lapply(data, function(x) {x[3]})))
+	structures <- unique(data.structures)
+	# EXTRACT DVH DATA FOR EACH STRUCTURE
+	DVH.list <- lapply(structures,
+		function (structure) {
+			which.data <- which(data.structures == structure)
+			which.dose <- data.dose[which.data]
+			which.volume <- data.volume[which.data]	
+			if (identical(which.volume,sort(which.volume,decreasing=TRUE))) {
+				DVH.type <- "cumulative"
+			}
+			else {
+				DVH.type <- "differential"
+			}
+			return(new("DVH", patient=patient, ID=ID, structure.name=structure, doses=which.dose, dose.units=dose.units, volumes=which.volume, type=DVH.type, dose.type=dose.type, volume.type=volume.type))	
+		})
+
+	return(DVH.list)
+}
+
+
+read.DVH.RayStation <- function (file, verbose=TRUE) {
+	if (!(fid <- file(file, open="r"))) {
+		warning(paste("Could not open file '", file, "'", sep=""))		
+		return()
+	}
+	if (verbose) {
+		cat("Reading DVH file ('", file, "')... ", sep="")
+	}
+	header <- readLines(fid, n=3)
+	data <- readLines(fid)
+	close(fid)
+
+	# EXTRACT HEADER INFORMATION
+    patient <- sub("^[#]PatientName.*:\\s*(.*)", "\\1", header[grep("^[#]PatientName.*:\\s*", header, ignore.case=TRUE, perl=TRUE)])
+    ID <- sub("^[#]PatientId.*:\\s*(.*)", "\\1", header[grep("^[#]PatientId.*:\\s*", header, ignore.case=TRUE, perl=TRUE)])
+	plan <- sub("^[#]Dosename:\\s*(.+$)", "\\1", header[grep("^[#]Dosename:\\s*", header, ignore.case=TRUE, perl=TRUE)])
+
+	# EXTRACT PLAN DOSE (IN CGY)
+	if (grepl("Plan dose:", plan, ignore.case=TRUE)) {
+		dose.rx <- as.numeric(sub("^Plan dose:\\s*([.0-9]+)c?Gy.*", "\\1", plan, perl=TRUE, ignore.case=TRUE))
+		if (toupper(sub("^Plan dose:\\s*[.0-9]+(c?Gy).*", "\\1", plan, perl=TRUE, ignore.case=TRUE)) == "GY") {
+			dose.rx <- dose.rx * 100		
+		}
+	}
+	else {
+		dose.rx <- NA
+	}
+
+    # IDENTIFY STRUCTURES
+    struct.start <- grep("^[#]RoiName:", data, perl=TRUE)
+    struct.end <- struct.start + diff(c(struct.start, length(data)+1)) - 1
+    if (length(struct.start) < 1) {
+		warning(paste("File '", file, "' contained no recognizable DVH structure(s)", sep=""))
+		if (verbose) {
+			cat("ERROR\n")
+		}
+		return()
+    }
+    else if (length(struct.start) == 1) {
+   	 	structures <- list(data[struct.start:struct.end])
+    }
+    else {
+	    structures <- mapply(function(start, end) list(data[start:end]), struct.start, struct.end)
+	}
+
+	if (verbose) {
+		cat("\n  Patient: ", patient, " (", ID, ")\n", sep="")
+		cat("  Plan: ", plan, "\n", sep="")		
+	}
+	DVH.type <- "cumulative"
+	# EXTRACT DVH DATA FOR EACH STRUCTURE
+	DVH.list <- lapply(structures,
+		function (data) {
+			# EXTRACT STRUCTURE NAME
+		    name <- sub("^[#]RoiName:\\s*(.+$)", "\\1", data[grep("^[#]RoiName:\\s*", data, ignore.case=TRUE, perl=TRUE)])
+		    if (length(name) < 1) {
+				warning("Invalid DVH file format, could not extract structure")
+				return(new("DVH"))
+		    }
+			# EXTRACT DOSE UNITS
+			dose.units <- toupper(sub("^[#]Dose unit:\\s*(.+$)", "\\1", data[grep("^[#]Dose unit:\\s*", data, ignore.case=TRUE, perl=TRUE)], perl=TRUE))
+		    if (length(dose.units) < 1) {
+				warning("Invalid DVH file format, could not extract dose units")
+				return(new("DVH"))
+		    }
+			if (dose.units == "GY") {
+				dose.units <- "Gy"
+			}
+			else if (dose.units == "CGY") {
+				dose.units <- "cGy"
+			}
+			
+		    volume <- suppressWarnings(as.numeric(sub("^.*:\\s*(.+)[%]$", "\\1", data[grep("^[#]Roi volume.*:\\s*", data, ignore.case=TRUE, perl=TRUE)], perl=TRUE)))
+		    if ((length(volume) == 1) & (volume > 0))  {
+				warning(paste(volume, "% volume of structure (", name, ") exists outside measureable dose grid, use DVH data with caution", sep=""))
+		    }
+			if (verbose) {
+				cat("  ..Importing structure: ", name, "  [units: ", dose.units, "]\n", sep="")
+			}
+			con <- textConnection(data[4:length(data)])
+			dvh <- read.table(con, header=FALSE, stringsAsFactors=FALSE)
+			close(con)
+			data.dose <- dvh[, 1]
+			data <- dvh[, 2]
+			return(new("DVH", structure.name=name, structure.volume=volume, doses=data.dose, volumes=data, type="cumulative", dose.type="absolute", dose.rx=if (dose.units == "Gy") {dose.rx*100} else {dose.rx}, dose.units=dose.units, volume.type="relative"))	
+		}
+	)
+
+	# RETURN DVH LIST
+	names(DVH.list) <- unlist(lapply(DVH.list, names))
+	return(new("DVH.list", DVH.list))
+
+}
+#line 1 "/Users/thompsre/RadOnc/R/structure.list.R"
+
+setMethod("as.list", "structure.list",
+	function(x, ...) {
+		return(attr(x,"structures"))
+	}
+)
+
+setAs("list", "structure.list", 
+	function(from) {
+		struct.list.combined <- new("structure.list")
+		lapply(from, function (struct.list) {
+			struct.list.combined <<- c(struct.list.combined, struct.list)
+		})
+		return(struct.list.combined)
+	}
+)
+
+setMethod("lapply", "structure.list",
+	function (X, FUN, ...) {
+    	X <- as.list(X)
+    	.Internal(lapply(X, FUN))
+	}
+)
+
+
+setMethod("length", "structure.list",
+	function (x) {
+		return(length(attr(x,"structures")))
+	}
+)
+
+
+setMethod("[", "structure.list",
+	function (x, i, ...) {
+		if (missing(i) || (length(i) < 1) || all(is.na(i))) {
+			return(new("structure.list"))
+		}
+		if (all(is.logical(i))) {
+			x <- attr(x,"structures")
+			return(new("structure.list", x[i]))
+		}
+		if (suppressWarnings(all(!is.na(as.numeric(i))))) {
+			x <- attr(x,"structures")
+			return(new("structure.list", x[as.numeric(i)]))
+		}
+		if (length(i) == 1) {
+			names.x <- names(x)
+			x <- attr(x,"structures")
+			if (grepl("(\\*|\\^|\\$|\\?|\\+|[[]|[{]|\\|)", i)) {
+				return(new("structure.list", x[grep(i, names.x)]))
+			}
+			else if (is.character(i)) {
+				return(new("structure.list", x[which(names.x == i)]))
+			}
+			else if (is.logical(i)) {
+				return(new("structure.list", x[i]))
+			}			
+			else if (suppressWarnings(!is.na(as.numeric(i)))) {
+				return(new("structure.list", x[as.numeric(i)]))
+			}
+			else {
+				return(new("structure.list", x[i]))
+			}			
+		}
+		return(c(x[i[1]], x[i[2:length(i)]]))
+	}
+)
+
+
+setMethod("$", "structure.list",
+	function (x, name) {
+		name <- unlist(strsplit(name, ","))
+		return(lapply(x, function (struct) { struct[name] }))		
+	}
+)
+
+
+setMethod("[[", "structure.list",
+	function (x, i, exact=TRUE) {
+		x <- attr(x,"structures")
+		return(x[[i]])
+	}
+)
+
+
+setMethod("[[<-", "structure.list",
+	function (x, i, value) {
+		x <- attr(x,"structures")
+		if (class(value) == "structure3D") {
+			x[[i]] <- value
+		}
+		else {
+			stop("'value' must be an object of class 'structure3D'")
+		}
+		return(new("structure.list", x))
+	}
+)
+
+setMethod("c", "structure.list",
+	function (x, ..., recursive = FALSE) {
+		return(new("structure.list", c(as.list(x), as.list(c(... , recursive=FALSE)))))
+	}
+)
+
+
+setMethod("rev", "structure.list",
+	function (x) {
+		if (length(x) <= 1) {
+			return(x)
+		}
+		else {
+			return(x[length(x):1])
+		}
+	}
+)
+
+
+setMethod("print", "structure.list",
+	function (x, ...) {
+		print(paste("List containing ", length(x), " structure3D objects (", paste(names(x), collapse=", ", sep=""), ")", sep=""))
+	}
+)
+
+
+setMethod("show", "structure.list",
+	function (object) {
+		print(object)
+	}
+)
+
+
+setMethod("names", "structure.list",
+	function (x) {
+		return(as.character(unlist(lapply(x, names))))
+	}
+)
+
+
+setMethod("names<-", "structure.list",
+ 	function (x, value) {
+		if (length(x) != length(value)) {
+			stop(paste("'names' attribute [", length(value), "] must be the same length as the structure3D list [", length(x), "]", sep=""))
+		}
+		struct.list <- new("structure.list", mapply(function(struct, name) {
+				struct$name <- name
+				return(struct)
+			},
+			x, value
+		))
+		names(attr(struct.list,"structures")) <- value
+		return(struct.list)
+  	}
+)
+
+setMethod("range", "structure.list",
+	function (x, ..., na.rm=TRUE) {
+		if (length(x) < 1) {
+			warning("Cannot calculate range of an empty structure list")
+			return(matrix(NA, nrow=2, ncol=3, dimnames=list(c("min", "max"), c("x", "y", "z"))))
+		}
+		ranges <- lapply(x, range)
+		range <- matrix(rep(c(Inf, -Inf), 3), nrow=2, ncol=3, dimnames=list(c("min", "max"), c("x", "y", "z")))
+		for (i in 1:length(ranges)) {
+			range[1, ] <- pmin(range[1, ], ranges[[i]][1, ], na.rm=na.rm)
+			range[2, ] <- pmax(range[2, ], ranges[[i]][2, ], na.rm=na.rm)
+		}
+		return(range)
+	}
+)
+#line 1 "/Users/thompsre/RadOnc/R/structure3D.R"
+setMethod("$", "structure3D",
+	function (x, name) {
+		if (inherits(try(slot(x, name), silent=TRUE), "try-error")) {
+			warning("'", name, "' is not a parameter in class 'structure3D'")
+			return(NULL)	
+		}
+		else {
+			return(slot(x, name))	
+		}
+	}
+)
+
+
+setMethod("names", "structure3D",
+	function (x) {
+		return(x$name)
+	}
+)
+
+
+setMethod("names<-", "structure3D",
+ 	function (x, value) {
+ 		x$name <- value
+ 		return(x)
+ 	}
+)
+
+
+setMethod("$<-", "structure3D",
+	function (x, name, value) {
+		if (inherits(try(slot(x, name), silent=TRUE), "try-error")) {
+			warning("'", name, "' is not a parameter in class 'structure3D'")
+		}
+		else {
+			slot(x, name) <- value
+		}
+		return(x)
+	}
+)
+
+setMethod("c", "structure3D",
+	function (x, ..., recursive = FALSE) {
+		return(c(as(x, "structure.list"), ..., recursive=FALSE))
+	}
+)
+
+setMethod("range", "structure3D",
+	function (x, ..., na.rm=TRUE) {
+		if (dim(x$vertices)[1] >= 1) {
+			range <- apply(x$vertices, 2, range, na.rm=na.rm)
+		}
+		else {
+			range <- matrix(NA, nrow=2, ncol=3)
+		}
+		dimnames(range) <- list(c("min", "max"), c("x", "y", "z"))
+		return(range)
+	}
+)
+
+setAs("structure3D", "structure.list", 
+	function(from) {
+		return(new("structure.list", structures=from))
+	}
+)
+
+setMethod("print", "structure3D",
+	function (x, ...) {
+		print(paste("Structure (", names(x), ") defined by ", dim(x$vertices)[1], " points in ", length(x$closed.polys), " axial slices", sep=""))
+	}
+)
+
+
+setMethod("show", "structure3D",
+	function (object) {
+		print(object)
+	}
+)
+
+setMethod("dim", "structure3D",
+	function (x) {
+		return(c(dim(attr(x,"vertices"))[1], length(attr(x,"closed.polys"))))
+	}
+)
+#line 1 "/Users/thompsre/RadOnc/R/subset.R"
+subset.DVH.list <- function(x, structure=NULL, patient=NULL, ID=NULL, constraint=NULL, ignore.case=TRUE, select=NULL) {
+	select <- match.arg(select, choices=c("all", "any", "none"))
+	switch(select,
+		all = results <- rep(TRUE, length(x)),
+		any = results <- rep(FALSE, length(x)),
+		none = results <- rep(FALSE, length(x))
+	)
+	if (!is.null(structure)) {
+		if (ignore.case) {
+			structure <- paste("(?i)", structure, sep="")
+		}
+		results.structure <- rep(FALSE, length(x))
+		for (i in structure) {
+			results.structure <- as.logical(results.structure + grepl(i, unlist(lapply(x, names))))
+		}
+		switch(select,
+			all = results <- as.logical(results * results.structure),
+			any = results <- as.logical(results + results.structure),
+			none = results <- as.logical(results + results.structure)
+		)
+	}
+	if (!is.null(patient)) {
+		if (ignore.case) {
+			patient <- paste("(?i)", patient, sep="")
+		}
+		results.patient <- rep(FALSE, length(x))
+		for (i in patient) {
+			results.patient <- as.logical(results.patient + grepl(i, as.character(x$patients)))
+		}
+		switch(select,
+			all = results <- as.logical(results * results.patient),
+			any = results <- as.logical(results + results.patient),
+			none = results <- as.logical(results + results.patient)
+		)
+	}
+	if (!is.null(ID)) {
+		results.ID <- rep(FALSE, length(x))
+		for (i in ID) {
+			results.ID <- as.logical(results.ID + (as.character(x$ID) == i))
+		}
+		switch(select,
+			all = results <- as.logical(results * results.ID),
+			any = results <- as.logical(results + results.ID),
+			none = results <- as.logical(results + results.ID)
+		)
+	}
+	if (!is.null(constraint)) {
+		results.constraint <- rep(FALSE, length(x))
+		for (i in constraint) {
+			results.constraint <- unlist(lapply(x, function(y) {y <- y[i]; y * (names(y) == "logical")}))
+			if (any(is.na(results.constraint))) {
+				results.constraint[which(is.na(results.constraint))] <- FALSE
+			}
+			switch(select,
+				all = results <- as.logical(results * results.constraint),
+				any = results <- as.logical(results + results.constraint),
+				none = results <- as.logical(results + results.constraint)
+			)
+		}
+	}
+	switch(select,
+		all = return(x[results]),
+		any = return(x[results]),
+		none = return(x[!results])
+	)		
+}
+	
+setGeneric("subset",
+	subset
+)
+	
+setMethod("subset", "DVH",
+	function (x, ...) {
+		subset.DVH.list(as(x, "DVH.list"), ...)
+	}
+)	
+
+setMethod("subset", "DVH.list",
+	function (x, ...) {
+		subset.DVH.list(x, ...)
+	}
+)
+#line 1 "/Users/thompsre/RadOnc/R/t.test.DVH.R"
+setGeneric("t.test",
+	t.test
+)
+
+setMethod("t.test", "DVH.list",
+	function(x, y=NULL, ..., paired=FALSE, mu=0, conf.level=0.95, var.equal=FALSE, alternative=c("two.sided", "greater", "less"), type=c("cumulative", "differential"), dose=c("absolute", "relative"), volume=c("relative", "absolute")) {
+		alternative <- match.arg(alternative)
+		type <- match.arg(type)
+		dose <- match.arg(dose)
+		volume <- match.arg(volume)
+		if (class(y) != "DVH.list") {
+			y <- new("DVH.list", y)
+		}
+		x <- new("DVH.list", lapply(x, convert.DVH, type=type, dose=dose, volume=volume))
+		x <- x[!unlist(lapply(x, is.empty))]		
+		y <- new("DVH.list", lapply(y, convert.DVH, type=type, dose=dose, volume=volume))
+		y <- y[!unlist(lapply(y, is.empty))]		
+		N.x <- length(x)
+		N.y <- length(y)
+		if (N.x < 2) {
+			stop("not enough 'x' observations")
+		}
+		if (N.y < 2) {
+			stop("not enough 'y' observations")
+		}
+		if (paired & (N.x != N.y)) {
+			stop("'x' and 'y' must have the same length")
+		}
+		doses <- var(c(x, y))$dose
+		data.x <- matrix(NA, nrow=length(doses), ncol=N.x)
+		for (i in 1:N.x) {
+			data.x[,i] <- approx(x[[i]]$doses, x[[i]]$volumes, doses, rule=2)$y
+		}
+		data.y <- matrix(NA, nrow=length(doses), ncol=N.y)
+		for (i in 1:N.y) {
+			data.y[,i] <- approx(y[[i]]$doses, y[[i]]$volumes, doses, rule=2)$y
+		}
+		ttest.x <- ttest.y <- ttest.p <- ttest.conf1 <- ttest.conf2 <- c()
+		for (i in 1:length(doses)) {
+			t.i <- 1
+			try(t.i <- t.test(data.x[i,], data.y[i,], paired=paired, mu=mu, conf.level=conf.level, var.equal=var.equal, alternative=alternative), silent=TRUE)
+			if (identical(t.i, 1)) {
+				ttest.x <- c(ttest.x, mean(data.x[i,], na.rm=TRUE))
+				ttest.y <- c(ttest.y, mean(data.y[i,], na.rm=TRUE))
+				ttest.p <- c(ttest.p, NA)
+				ttest.conf1 <- c(ttest.conf1, NA)
+				ttest.conf2 <- c(ttest.conf2, NA)
+			}
+			else {
+				if (paired) {
+					ttest.x <- c(ttest.x, mean(data.x[i,], na.rm=TRUE))
+					ttest.y <- c(ttest.y, mean(data.y[i,], na.rm=TRUE))
+				}
+				else {
+					ttest.x <- c(ttest.x, t.i$estimate[1])
+					ttest.y <- c(ttest.y, t.i$estimate[2])
+				}
+				ttest.p <- c(ttest.p, t.i$p.value)
+				ttest.conf1 <- c(ttest.conf1, t.i$conf.int[1])
+				ttest.conf2 <- c(ttest.conf2, t.i$conf.int[2])
+			}
+		}
+		return(list(dose=doses, x.mean=ttest.x, y.mean=ttest.y, p=ttest.p, conf.int1=ttest.conf1, conf.int2=ttest.conf2))
+	}
+)
+#line 1 "/Users/thompsre/RadOnc/R/wilcox.DVH.R"
+setGeneric("wilcox.test",
+	wilcox.test
+)
+
+setMethod("wilcox.test", "DVH.list",
+	function(x, y=NULL, alternative=c("two.sided", "greater", "less"), mu=0, paired=FALSE, exact=TRUE, correct=TRUE, conf.level=0.95, ..., type=c("cumulative", "differential"), dose=c("absolute", "relative"), volume=c("relative", "absolute")) {
+		type <- match.arg(type)
+		dose <- match.arg(dose)
+		volume <- match.arg(volume)
+		alternative <- match.arg(alternative)
+		if (class(y) != "DVH.list") {
+			y <- new("DVH.list", y)
+		}
+		x <- new("DVH.list", lapply(x, convert.DVH, type=type, dose=dose, volume=volume))
+		x <- x[!unlist(lapply(x, is.empty))]
+		y <- new("DVH.list", lapply(y, convert.DVH, type=type, dose=dose, volume=volume))
+		y <- y[!unlist(lapply(y, is.empty))]
+		N.x <- length(x)
+		N.y <- length(y)
+		if (N.x < 1) {
+			stop("not enough 'x' observations")
+		}
+		if (N.y < 1) {
+			stop("not enough 'y' observations")
+		}
+		if (paired & (N.x != N.y)) {
+			stop("'x' and 'y' must have the same length")
+		}
+		doses <- var(c(x, y))$dose
+		data.x <- matrix(NA, nrow=length(doses), ncol=N.x)
+		for (i in 1:N.x) {
+			data.x[,i] <- approx(x[[i]]$doses, x[[i]]$volumes, doses, rule=2)$y
+		}
+		data.y <- matrix(NA, nrow=length(doses), ncol=N.y)
+		for (i in 1:N.y) {
+			data.y[,i] <- approx(y[[i]]$doses, y[[i]]$volumes, doses, rule=2)$y
+		}
+		wilcox.x <- wilcox.y <- wilcox.p <- wilcox.conf1 <- wilcox.conf2 <- wilcox.est <- c()
+		for (i in 1:length(doses)) {
+			w.i <- 1
+			suppressWarnings(try(w.i <- wilcox.test(data.x[i,], data.y[i,], paired=paired, mu=mu, conf.level=conf.level, exact=exact, alternative=alternative, conf.int=TRUE, correct=correct), silent=TRUE))
+			wilcox.x <- c(wilcox.x, median(data.x[i,], na.rm=TRUE))
+			wilcox.y <- c(wilcox.y, median(data.y[i,], na.rm=TRUE))
+			if (identical(w.i, 1)) {
+				wilcox.p <- c(wilcox.p, NA)
+				wilcox.conf1 <- c(wilcox.conf1, NA)
+				wilcox.conf2 <- c(wilcox.conf2, NA)
+				wilcox.est <- c(wilcox.est, NA)
+			}			
+			else {
+				wilcox.p <- c(wilcox.p, w.i$p.value)
+				wilcox.conf1 <- c(wilcox.conf1, w.i$conf.int[1])
+				wilcox.conf2 <- c(wilcox.conf2, w.i$conf.int[2])
+				if (paired) {
+					wilcox.est <- c(wilcox.est, median(data.x[i,]-data.y[i,], na.rm=TRUE))
+				}
+				else {
+					wilcox.est <- c(wilcox.est, w.i$estimate)
+				}
+			}
+		}
+		return(list(dose=doses, x.med=wilcox.x, y.med=wilcox.y, p=wilcox.p, conf.int1=wilcox.conf1, conf.int2=wilcox.conf2, estimate=wilcox.est))
+	}
+)
+#line 1 "/Users/thompsre/RadOnc/R/zDVH.R"
+
+setMethod("$", "zDVH",
+	function (x, name) {
+		if (inherits(try(slot(x, name), silent=TRUE), "try-error")) {
+			return(NULL)	
+		}
+		else {
+			return(slot(x, name))	
+		}
+	}
+)
+
+setMethod("names", "zDVH",
+	function (x) {
+		return(x$structure.name)
+	}
+)
+
+setMethod("names<-", "zDVH",
+ 	function (x, value) {
+ 		x$structure.name <- value
+ 		return(x)
+ 	}
+)
+
+setMethod("$<-", "zDVH",
+	function (x, name, value) {
+		if (inherits(try(slot(x, name), silent=TRUE), "try-error")) {
+			warning("'", name, "' is not a parameter in class 'zDVH'")
+		}
+		else {
+			slot(x, name) <- value
+		}
+		return(x)
+	}
+)
+
+setMethod("[", "zDVH",
+	function (x, i, ...) {
+		if (!validObject(x)) {
+			stop("not a valid object of 'zDVH'")
+		}
+		x <- as(x, "DVH")
+		return(x[i])
+	}
+)
+
+
+setMethod("c", "zDVH",
+	function (x, ..., recursive = FALSE) {
+		return(c(as(x, "DVH.list"), ..., recursive=recursive))
+	}
+)
+
+setMethod("sum", "DVH",
+	function (x, ..., na.rm = TRUE) {
+		return(sum(as(x, "DVH.list"), ..., na.rm = na.rm))
+	}
+)
+
+setMethod("print", "zDVH",
+	function (x, ...) {
+		if (x@dose.type == "relative") {
+			dose.type <- "%"
+			dose.min <- x@dose.min * x@rx.isodose / x@dose.rx
+			dose.max <- x@dose.max * x@rx.isodose / x@dose.rx
+		}
+		else {
+			dose.type <- x@dose.units
+			dose.min <- x@dose.min
+			dose.max <- x@dose.max
+		}
+		print(paste("Structure: ", x@structure.name, " (", sprintf("%.*f", 1, x@structure.volume), "cc), Dose: ", sprintf("%.*f", 2, dose.min), "-", sprintf("%.*f", 2, dose.max), dose.type, " (", x@dose.rx, x@dose.units, " prescribed", if (x@rx.isodose != 100) {paste(" to ", x@rx.isodose, "% isodose line", sep="")}, "), DVH: ", x@type, ", Volume: ", x@volume.type, ", Axial segments: ", dim(x@volumes)[2], sep=""))
+	}
+)
+
+setMethod("show", "zDVH",
+	function (object) {
+		print(object)
+	}
+)

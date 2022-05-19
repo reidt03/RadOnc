@@ -308,22 +308,6 @@ plot(janedoe[2:9], plot.type="b", volume="abs", dose="rel")
 \end{figure}
 
 \newpage
-\begin{figure}[H]
-\begin{center}
-<<echo=TRUE,eval=FALSE>>=
-plot(stomach, col="lightblue")
-@
-<<label=fig7,fig=TRUE,echo=FALSE>>=
-par(mar=c(2,2,2,2))
-persp(stomach$doses,as.numeric(colnames(stomach$volumes)),stomach$volumes,border=NA,col="lightblue",shade=0.65,xlab="Dose (Gy)",zlab="Volume (cc)",ylab="z (mm)",ticktype="detailed",phi=30, theta=30)
-@
-\end{center}
-\caption{Axially-segmented DVH (zDVH) displayed as a differential DVH in a three dimensional projection. Plotting in this format simply requires input of a single zDVH object.}
-\label{fig:seven}
-\end{figure}
-
-
-\newpage
 \subsection{DVH statistics}
 \label{DVH.stats}
 Mean or median DVHs can be calculated using the \Rfunction{mean()} and \Rfunction{median()} functions, respectively. These functions take a DVH list as input and return a single object of class \Rfunction{DVH} representing the mean or median dose-volume histogram data calculated from the entire group.
