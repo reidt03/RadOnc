@@ -500,16 +500,16 @@ setMethod("initialize",
 		...
 	) {
 		.Object@name <- name
-		if !inherits(CT,"array") {
+		if (!inherits(CT,"array")) {
 			CT <- array(dim=c(0,0,0))
 		}
 		.Object@CT <- CT
-		if !inherits(dose,"array") {
+		if (!inherits(dose,"array")) {
 			dose <- array(dim=c(0,0,0))
 		}
 		.Object@dose <- dose
 		attr(.Object@dose, "dose.units") <- character()
-		if inherits(structures,"structure.list") {
+		if (inherits(structures,"structure.list")) {
 			.Object@structures <- structures
 		}
 		else {
