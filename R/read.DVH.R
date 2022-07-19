@@ -7,7 +7,7 @@ read.DVH <- function (file, type=NA, verbose=TRUE, collapse=TRUE, modality=NULL,
 		return()
 	}
 	
-	read.DVH.file <- function (file, type, verbose=TRUE, encoding=encoding) {
+	read.DVH.file <- function (file, type, verbose=TRUE) {
 		switch(type, 
 			aria10 = return(read.DVH.Aria10(file=file, verbose=verbose, encoding=encoding)),
 			aria8 = return(read.DVH.Aria8(file=file, verbose=verbose, encoding=encoding)),

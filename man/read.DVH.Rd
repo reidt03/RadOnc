@@ -7,7 +7,7 @@ Read DVH data from input file
 Function to extract DVH data from input file(s). Supported file formats include Aria (v8-13), DICOM-RT, CadPlan, Monaco, RayStation, and TomoTherapy.
 }
 \usage{
-read.DVH(file, type=NA, verbose=TRUE, collapse=TRUE, modality=NULL, encoding="")
+read.DVH(file, type=NA, verbose=TRUE, collapse=TRUE, modality=NULL, encoding="latin1")
 }
 \arguments{
   \item{file}{
